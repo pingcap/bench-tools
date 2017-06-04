@@ -1,0 +1,21 @@
+[package]
+name = "rocksdb-in-tikv"
+version = "0.1.0"
+authors = ["Liu Cong <innerr@gmail.com>"]
+
+[features]
+default = []
+static-link = ["rocksdb/static-link"]
+portable = ["rocksdb/portable"]
+sse = ["rocksdb/sse"]
+
+[[bin]]
+name = "rocksdb-in-tikv"
+
+[dependencies]
+clap = "2"
+libc = "0.2"
+toml = "0.1"
+
+[dependencies.rocksdb]
+git = "https://github.com/pingcap/rust-rocksdb.git"
