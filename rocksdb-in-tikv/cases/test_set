@@ -1,4 +1,4 @@
-100 cases/base.toml cases/cf_lock.toml cf lock
-100 cases/base.toml cases/cf_lock.toml cf lock
-100000 cases/base.toml cases/cf_lock.toml cf lock
+10000   cases/base.toml cases/cf_lock.toml cf lock
+10000   cases/base.toml cases/cf_lock.toml cf lock
+100000  cases/base.toml cases/cf_lock.toml cf lock
 1000000 cases/base.toml cases/cf_lock.toml cf lock
