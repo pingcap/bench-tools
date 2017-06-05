@@ -57,6 +57,10 @@ while read line; do
 done < $plan
 
 fastest=`cat $log | grep 'tps:' | awk '{print $NF" "$1}' | sort -nrk 1 | head -n 1`
+if [ -z "$fastest" ]; then
+	exit 1
+fi
+
 speed=`echo "$fastest" | awk '{print $1}'`
 ts=`echo "$fastest" | awk '{print $2}'`
 
