@@ -11,22 +11,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub trait ValGen<'a> {
-    fn next(&mut self) -> Option<&'a[u8]>;
+pub trait ValGen {
+    fn next(&mut self) -> Option<&[u8]>;
 }
 
-pub struct ConstValGen<'a> {
-    val: &'a[u8],
+pub struct ConstValGen {
+    val: Vec<u8>,
 }
 
-impl<'a> ValGen<'a> for ConstValGen<'a> {
-    fn next(&mut self) -> Option<&'a[u8]> {
-        Some(self.val)
+impl ConstValGen {
+    pub fn new(val: &[u8]) -> ConstValGen {
+        ConstValGen { val: val.to_vec() }
     }
 }
 
-impl<'a> ConstValGen<'a> {
-    pub fn new(val: &'a[u8]) -> ConstValGen<'a> {
-        ConstValGen{val: val}
+impl ValGen for ConstValGen {
+    fn next(&mut self) -> Option<&[u8]> {
+        Some(&self.val)
     }
 }

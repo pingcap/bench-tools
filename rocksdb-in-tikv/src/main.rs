@@ -84,11 +84,11 @@ fn run() -> Result<usize, String> {
     let res = match matches.subcommand() {
         ("cf", Some(cf)) => {
             match cf.subcommand_name() {
-                Some("data") => sim::cf::cf_data_w(db),
+                Some("data") => sim::cf::cf_default_w(db),
                 Some("lock") => sim::cf::cf_lock_w(db,
                     &mut key::RepeatKeyGen::new(b"test-key", count),
                     &mut val::ConstValGen::new(b"test-val")),
-                Some("commit") => sim::cf::cf_commit_w(db),
+                Some("commit") => sim::cf::cf_write_w(db),
                 Some("raft") => sim::cf::cf_raft_w(db),
                 _ => help_err(app)
             }

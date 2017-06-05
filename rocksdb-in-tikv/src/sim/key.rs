@@ -11,43 +11,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub trait KeyGen<'a> {
-    fn next(&mut self) -> Option<&'a[u8]>;
+pub trait KeyGen {
+    fn next(&mut self) -> Option<&[u8]>;
 }
 
-pub struct RepeatKeyGen<'a> {
-    key: &'a[u8],
-    times: usize
+pub struct RepeatKeyGen {
+    key: Vec<u8>,
+    cnt: usize,
 }
 
-impl<'a> KeyGen<'a> for RepeatKeyGen<'a> {
-    fn next(&mut self) -> Option<&'a[u8]> {
-        if self.times == 0 {
-            return None;
+impl RepeatKeyGen {
+    pub fn new(key: &[u8], cnt: usize) -> RepeatKeyGen {
+        RepeatKeyGen {
+            key: key.to_vec(),
+            cnt: cnt,
         }
-        self.times -= 1;
-        Some(self.key)
     }
 }
 
-impl<'a> RepeatKeyGen<'a> {
-    pub fn new(key: &'a[u8], times: usize) -> RepeatKeyGen<'a> {
-        RepeatKeyGen{key: key, times: times}
+impl KeyGen for RepeatKeyGen {
+    fn next(&mut self) -> Option<&[u8]> {
+        if self.cnt > 0 {
+            self.cnt -= 1;
+            Some(&self.key)
+        } else if self.cnt == 0 {
+            None
+        } else {
+            Some(&self.key)
+        }
     }
 }
 
-//pub struct IncreaseKeyGen<'a> {
-//    curr: &'a[u8]
-//}
-//
-//impl<'a> KeyGen<'a> for IncreaseKeyGen<'a> {
-//    fn next(&mut self) -> Option<&'a[u8]> {
+// pub struct IncreaseKeyGen {
+//    curr: &[u8]
+// }
+
+// impl Iterator for IncreaseKeyGen {
+//    fn next(&mut self) -> Option<&[u8]> {
 //        None
 //    }
-//}
-//
-//impl<'a> IncreaseKeyGen<'a> {
-//    pub fn new(key_len: usize) -> IncreaseKeyGen<'a> {
+// }
+
+// impl IncreaseKeyGen {
+//    pub fn new(key_len: usize) -> IncreaseKeyGen {
 //        IncreaseKeyGen{curr: b"test"}
 //    }
-//}
+// }

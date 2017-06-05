@@ -12,12 +12,12 @@
 // limitations under the License.
 
 use rocksdb::{DB, WriteBatch, Writable};
-use super::key::KeyGen;
-use super::val::ValGen;
+use super::key::*;
+use super::val::*;
 
-pub fn cf_data_w(db: DB) -> Result<(), String> {
+pub fn cf_default_w(db: DB) -> Result<(), String> {
     let _ = db;
-    Err("not impl: cf_data_w".to_string())
+    Err("not impl: cf_raft_w".to_string())
 }
 
 pub fn cf_lock_w(db: DB, keys: &mut KeyGen, vals: &mut ValGen) -> Result<(), String> {
@@ -42,9 +42,9 @@ pub fn cf_lock_w(db: DB, keys: &mut KeyGen, vals: &mut ValGen) -> Result<(), Str
     Ok(())
 }
 
-pub fn cf_commit_w(db: DB) -> Result<(), String> {
+pub fn cf_write_w(db: DB) -> Result<(), String> {
     let _ = db;
-    Err("not impl: cf_commit_w".to_string())
+    Err("not impl: cf_raft_w".to_string())
 }
 
 pub fn cf_raft_w(db: DB) -> Result<(), String> {
