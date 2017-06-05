@@ -1,4 +1,26 @@
 [rocksdb]
+# info-log-dir = ""
+# info-log-max-size = 0
+# info-log-roll-time = "0s"
+max-background-compactions = 6
+max-background-flushes = 2
+# base-background-compactions = 1
+# max-sub-compactions = 1
+# max-open-files = 40960
+max-manifest-file-size = "20MB"
+create-if-missing = true
+wal-recovery-mode = 2
+# wal-dir = "/tmp/tikv/store"
+# wal-ttl-seconds = 0
+# wal-size-limit = 0
+# max-total-wal-size = "4GB"
+# writable-file-max-buffer-size = "1MB"
+# enable-statistics = true
+stats-dump-period-sec = 600
+# compaction-readahead-size = 0
+# writable-file-max-buffer-size = "1MB"
+# use-direct-io-for-flush-and-compaction = false
+# rate-bytes-per-sec = 0
 
 [rocksdb.cf]
 compression-per-level = "no:no:lz4:lz4:lz4:zstd:zstd"
@@ -14,5 +36,4 @@ level0-slowdown-writes-trigger = 20
 level0-stop-writes-trigger = 36
 cache-index-and-filter-blocks = true
 
-# in normal cases should tune to 10%-30% system's total memory.
 block-cache-size = "256MB"

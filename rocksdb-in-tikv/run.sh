@@ -42,9 +42,8 @@ function logi() {
 while read line; do
 	ts="#`date +%s`""`date +%N`"
 	cnt=`echo "$line" | awk '{print $1}'`
-	cfg1=`echo "$line" | awk '{print $2}'`
-	cfg2=`echo "$line" | awk '{print $3}'`
-	rest=`echo "$line" | awk '{for(i=4;i<=NF;i++)printf $i" ";}'`
+	cfg=`echo "$line" | awk '{print $2}'`
+	rest=`echo "$line" | awk '{for(i=3;i<=NF;i++)printf $i" ";}'`
 	echo "start: $cfg1 + $cfg2" | logt | logi $ts | tee -a $log
 	cat $cfg1  | logi $ts >> $log
 	echo "---" | logi $ts >> $log

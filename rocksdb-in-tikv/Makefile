@@ -27,11 +27,5 @@ build:
 	@mkdir -p ${BIN_PATH}
 	cp -f ${CARGO_TARGET_DIR}/release/rocksdb-in-tikv ${BIN_PATH}/
 
-static_release:
-	ROCKSDB_SYS_STATIC=1 ROCKSDB_SYS_PORTABLE=1 ROCKSDB_SYS_SSE=1  make release
-
-static_unportable_release:
-	ROCKSDB_SYS_STATIC=1 ROCKSDB_SYS_SSE=1  make release
-
 clean:
 	cargo clean
