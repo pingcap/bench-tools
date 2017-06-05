@@ -39,4 +39,3 @@ block-based-bloom-filter = false
 bloom-filter-bits-per-key = 10
 
 compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
-#compression-per-level = "no:no:lz4:lz4:lz4:zstd:zstd"

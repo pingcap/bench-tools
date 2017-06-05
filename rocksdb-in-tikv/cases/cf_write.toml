@@ -13,6 +13,4 @@ level0-file-num-compaction-trigger = 4
 level0-slowdown-writes-trigger = 20
 level0-stop-writes-trigger = 36
 cache-index-and-filter-blocks = true
-
-# in normal cases should tune to 10%-30% system's total memory.
 block-cache-size = "256MB"

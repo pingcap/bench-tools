@@ -20,9 +20,9 @@ default: all
 
 .PHONY: all
 
-all: build
+all: release
 
-build:
+release:
 	RUST_BACKTRACE=1 cargo build --release --features "${ENABLE_FEATURES}"
 	@mkdir -p ${BIN_PATH}
 	cp -f ${CARGO_TARGET_DIR}/release/rocksdb-in-tikv ${BIN_PATH}/

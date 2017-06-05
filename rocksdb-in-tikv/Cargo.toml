@@ -1,7 +1,6 @@
 [package]
 name = "rocksdb-in-tikv"
 version = "0.1.0"
-authors = ["Liu Cong <innerr@gmail.com>"]
 
 [features]
 default = []

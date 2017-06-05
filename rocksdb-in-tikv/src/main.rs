@@ -1,4 +1,4 @@
-// Copyright 2016 PingCAP, Inc.
+// Copyright 2017 PingCAP, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,12 +35,12 @@ fn run() -> Result<usize, String> {
             .takes_value(true)
             .help("rocksdb path")
             .required(true))
-        .arg(Arg::with_name("cfg1")
+        .arg(Arg::with_name("base_cfg")
             .short("c")
             .takes_value(true)
             .help("base toml config file")
             .required(true))
-        .arg(Arg::with_name("cfg2")
+        .arg(Arg::with_name("tuning_cfg")
             .short("t")
             .takes_value(true)
             .help("tuning toml config file")
@@ -70,8 +70,8 @@ fn run() -> Result<usize, String> {
     }
 
     let db_path = matches.value_of("db").unwrap();
-    let base_cfg = matches.value_of("cfg1").unwrap();
-    let tuning_cfg = matches.value_of("cfg2").unwrap();
+    let base_cfg = matches.value_of("base_cfg").unwrap();
+    let tuning_cfg = matches.value_of("tuning_cfg").unwrap();
     let (opt_db, opt_cf) = try!(dbcfg::get_db_config(base_cfg, tuning_cfg));
     let db = try!(DB::open_cf(opt_db, db_path, &["default"], &[&opt_cf]));
 
