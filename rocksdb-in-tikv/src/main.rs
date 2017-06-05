@@ -95,12 +95,14 @@ fn run() -> Result<usize, String> {
                         Some("repeat") => {
                             sim::cf::cf_lock_w(db,
                                                &mut key::RepeatKeyGen::new(&vec![0; 32], count),
-                                               &mut val::ConstValGen::new(&vec![0; 8]))
+                                               &mut val::ConstValGen::new(&vec![0; 8]),
+                                               128)
                         }
                         _ => {
                             sim::cf::cf_lock_w(db,
                                                &mut key::IncreaseKeyGen::new(&vec![0; 32], count),
-                                               &mut val::ConstValGen::new(&vec![0; 8]))
+                                               &mut val::ConstValGen::new(&vec![0; 8]),
+                                               128)
                         }
                     }
                 }
