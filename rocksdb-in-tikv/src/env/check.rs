@@ -105,7 +105,7 @@ mod check_kernel {
 pub use self::check_kernel::check_kernel;
 
 #[cfg(not(target_os = "linux"))]
-pub fn check_kernel() -> Vec<Result> {
+pub fn check_kernel() -> Vec<Result(), String> {
     Vec::new()
 }
 
