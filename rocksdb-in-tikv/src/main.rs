@@ -15,6 +15,7 @@ extern crate libc;
 extern crate clap;
 extern crate rocksdb;
 extern crate toml;
+extern crate rand;
 
 use std::process;
 use std::time::Instant;
@@ -24,7 +25,7 @@ use rocksdb::DB;
 mod sim;
 mod env;
 use env::dbcfg;
-use sim::{key, val};
+use sim::{key, val, cf};
 
 fn run() -> Result<usize, String> {
     let app = App::new("Rocksdb in TiKV")
@@ -51,8 +52,7 @@ fn run() -> Result<usize, String> {
             .required(false))
         .subcommand(SubCommand::with_name("cf")
             .subcommand(SubCommand::with_name("default"))
-            .subcommand(SubCommand::with_name("lock")
-                .arg(Arg::with_name("keygen")
+            .subcommand(SubCommand::with_name("lock").arg(Arg::with_name("keygen")
                 .short("k")
                 .help("key generator")
                 .required(false)))
@@ -82,29 +82,42 @@ fn run() -> Result<usize, String> {
     let res = match matches.subcommand() {
         ("cf", Some(cf)) => {
             match cf.subcommand() {
-                ("default", Some(_)) => sim::cf::cf_default_w(db),
-                ("lock", Some(cf_t)) => match cf_t.value_of("keygen") {
-                    Some("repeat") => sim::cf::cf_lock_w(db,
-                        &mut key::RepeatKeyGen::new(&vec![0; 32], count),
-                        &mut val::ConstValGen::new(&vec![0; 8])),
-                    _ => sim::cf::cf_lock_w(db,
-                        &mut key::IncreaseKeyGen::new(&vec![0; 32], count),
-                        &mut val::ConstValGen::new(&vec![0; 8])),
-                },
+                ("default", Some(_)) => {
+                    let key = cf::gen_rand_str(32);
+                    let value = cf::gen_rand_str(128);
+                    sim::cf::cf_default_w(db,
+                                          &mut key::RepeatKeyGen::new(&key, 1000),
+                                          &mut val::ConstValGen::new(&value),
+                                          128)
+                }
+                ("lock", Some(cf_t)) => {
+                    match cf_t.value_of("keygen") {
+                        Some("repeat") => {
+                            sim::cf::cf_lock_w(db,
+                                               &mut key::RepeatKeyGen::new(&vec![0; 32], count),
+                                               &mut val::ConstValGen::new(&vec![0; 8]))
+                        }
+                        _ => {
+                            sim::cf::cf_lock_w(db,
+                                               &mut key::IncreaseKeyGen::new(&vec![0; 32], count),
+                                               &mut val::ConstValGen::new(&vec![0; 8]))
+                        }
+                    }
+                }
                 ("write", Some(_)) => sim::cf::cf_write_w(db),
                 ("raft", Some(_)) => sim::cf::cf_raft_w(db),
-                _ => help_err(app)
+                _ => help_err(app),
             }
         }
         ("txn", Some(_)) => {
             return Err("txn bench mark not impl".to_owned());
         }
-        _ => help_err(app)
+        _ => help_err(app),
     };
 
     match res {
         Ok(_) => Ok(count),
-        Err(e) => Err(e)
+        Err(e) => Err(e),
     }
 }
 
@@ -123,11 +136,12 @@ fn main() {
         }
         Ok(count) => {
             let elapsed = timer.elapsed();
-            let tps = count as f64 / (elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1e9);
+            let tps = count as f64 /
+                      (elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1e9);
             print!("invoke {} times in {} ms, tps: {}\n",
-                count,
-                elapsed.as_secs() * 1000 + (elapsed.subsec_nanos() as f64 / 1e6) as u64,
-                tps as u64);
+                   count,
+                   elapsed.as_secs() * 1000 + (elapsed.subsec_nanos() as f64 / 1e6) as u64,
+                   tps as u64);
         }
     };
 }

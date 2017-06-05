@@ -12,12 +12,50 @@
 // limitations under the License.
 
 use rocksdb::{DB, WriteBatch, Writable};
+use rand::{Rng, thread_rng};
+
 use super::key::*;
 use super::val::*;
 
-pub fn cf_default_w(db: DB) -> Result<(), String> {
-    let _ = db;
-    Err("not impl: cf_raft_w".to_string())
+#[inline]
+pub fn gen_rand_str(len: usize) -> Vec<u8> {
+    let mut rand_str = vec![0; len];
+    thread_rng().fill_bytes(&mut rand_str);
+    rand_str
+}
+
+pub fn cf_default_w(db: DB,
+                    keys: &mut KeyGen,
+                    vals: &mut ValGen,
+                    batch_size: usize)
+                    -> Result<(), String> {
+    let mut finish = false;
+    loop {
+        let wb = WriteBatch::new();
+        for _ in 0..batch_size {
+            let key = match keys.next() {
+                Some(v) => v,
+                _ => {
+                    finish = true;
+                    break;
+                }
+            };
+            let val = match vals.next() {
+                Some(v) => v,
+                _ => {
+                    finish = true;
+                    break;
+                }
+            };
+            try!(wb.put(key, val));
+        }
+
+        try!(db.write(wb));
+        if finish {
+            break;
+        }
+    }
+    Ok(())
 }
 
 pub fn cf_lock_w(db: DB, keys: &mut KeyGen, vals: &mut ValGen) -> Result<(), String> {
@@ -31,13 +69,10 @@ pub fn cf_lock_w(db: DB, keys: &mut KeyGen, vals: &mut ValGen) -> Result<(), Str
             _ => break,
         };
 
-        let batch = WriteBatch::new();
-        try!(batch.put(key, val));
-        try!(db.write(batch));
-
-        let batch = WriteBatch::new();
-        try!(batch.delete(key));
-        try!(db.write(batch));
+        let wb = WriteBatch::new();
+        try!(wb.put(key, val));
+        try!(wb.delete(key));
+        try!(db.write(wb));
     }
     Ok(())
 }
