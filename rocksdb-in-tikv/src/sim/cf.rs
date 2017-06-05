@@ -12,17 +12,9 @@
 // limitations under the License.
 
 use rocksdb::{DB, WriteBatch, Writable};
-use rand::{Rng, thread_rng};
 
 use super::key::*;
 use super::val::*;
-
-#[inline]
-pub fn gen_rand_str(len: usize) -> Vec<u8> {
-    let mut rand_str = vec![0; len];
-    thread_rng().fill_bytes(&mut rand_str);
-    rand_str
-}
 
 pub fn cf_default_w(db: DB,
                     keys: &mut KeyGen,

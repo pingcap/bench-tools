@@ -25,7 +25,9 @@ use rocksdb::DB;
 mod sim;
 mod env;
 use env::dbcfg;
-use sim::{key, val, cf};
+use sim::key::{RepeatKeyGen, IncreaseKeyGen, RandomKeyGen};
+use sim::val::ConstValGen;
+use sim::{cf, gen_rand_str};
 
 fn run() -> Result<usize, String> {
     let app = App::new("Rocksdb in TiKV")
@@ -83,31 +85,30 @@ fn run() -> Result<usize, String> {
         ("cf", Some(cf)) => {
             match cf.subcommand() {
                 ("default", Some(_)) => {
-                    let key = cf::gen_rand_str(32);
-                    let value = cf::gen_rand_str(128);
-                    sim::cf::cf_default_w(db,
-                                          &mut key::RepeatKeyGen::new(&key, 1000),
-                                          &mut val::ConstValGen::new(&value),
-                                          128)
+                    let value = gen_rand_str(128);
+                    cf::cf_default_w(db,
+                                     &mut RandomKeyGen::new(30, 1000),
+                                     &mut ConstValGen::new(&value),
+                                     128)
                 }
                 ("lock", Some(cf_t)) => {
                     match cf_t.value_of("keygen") {
                         Some("repeat") => {
-                            sim::cf::cf_lock_w(db,
-                                               &mut key::RepeatKeyGen::new(&vec![0; 32], count),
-                                               &mut val::ConstValGen::new(&vec![0; 8]),
-                                               128)
+                            cf::cf_lock_w(db,
+                                          &mut RepeatKeyGen::new(&vec![0; 32], count),
+                                          &mut ConstValGen::new(&vec![0; 8]),
+                                          128)
                         }
                         _ => {
-                            sim::cf::cf_lock_w(db,
-                                               &mut key::IncreaseKeyGen::new(&vec![0; 32], count),
-                                               &mut val::ConstValGen::new(&vec![0; 8]),
-                                               128)
+                            cf::cf_lock_w(db,
+                                          &mut IncreaseKeyGen::new(&vec![0; 32], count),
+                                          &mut ConstValGen::new(&vec![0; 8]),
+                                          128)
                         }
                     }
                 }
-                ("write", Some(_)) => sim::cf::cf_write_w(db),
-                ("raft", Some(_)) => sim::cf::cf_raft_w(db),
+                ("write", Some(_)) => cf::cf_write_w(db),
+                ("raft", Some(_)) => cf::cf_raft_w(db),
                 _ => help_err(app),
             }
         }

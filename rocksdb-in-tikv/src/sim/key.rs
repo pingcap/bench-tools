@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use rand::{Rng, thread_rng};
+
 pub trait KeyGen {
     fn next(&mut self) -> Option<&[u8]>;
 }
@@ -69,6 +71,31 @@ impl KeyGen for IncreaseKeyGen {
         if self.cnt > 0 {
             self.cnt -= 1;
             self.key_inc();
+            Some(&self.key)
+        } else {
+            None
+        }
+    }
+}
+
+pub struct RandomKeyGen {
+    key: Vec<u8>,
+    cnt: usize,
+}
+
+impl RandomKeyGen {
+    pub fn new(size: usize, cnt: usize) -> RandomKeyGen {
+        RandomKeyGen {
+            key: Vec::with_capacity(size),
+            cnt: cnt,
+        }
+    }
+}
+
+impl KeyGen for RandomKeyGen {
+    fn next(&mut self) -> Option<&[u8]> {
+        if self.cnt > 0 {
+            thread_rng().fill_bytes(&mut self.key);
             Some(&self.key)
         } else {
             None
