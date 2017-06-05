@@ -317,10 +317,7 @@ fn get_rocksdb_db_option(config: &toml::Value, prefix: &str) -> Options {
     opts
 }
 
-pub fn get_db_config(base: &str, tuning: &str) -> Result<(Options, Options), String> {
-    // TODO: combine base and tuning config file
-    let _ = tuning;
-
+pub fn get_db_config(base: &str) -> Result<(Options, Options), String> {
     let mut base_file = File::open(&base).expect("config open failed");
     let mut s = String::new();
     base_file.read_to_string(&mut s).expect("config read failed");

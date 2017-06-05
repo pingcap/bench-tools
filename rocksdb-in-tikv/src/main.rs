@@ -35,15 +35,10 @@ fn run() -> Result<usize, String> {
             .takes_value(true)
             .help("rocksdb path")
             .required(true))
-        .arg(Arg::with_name("base_cfg")
+        .arg(Arg::with_name("cfg")
             .short("c")
             .takes_value(true)
-            .help("base toml config file")
-            .required(true))
-        .arg(Arg::with_name("tuning_cfg")
-            .short("t")
-            .takes_value(true)
-            .help("tuning toml config file")
+            .help("toml config file")
             .required(true))
         .arg(Arg::with_name("count")
             .short("n")
@@ -70,9 +65,8 @@ fn run() -> Result<usize, String> {
     }
 
     let db_path = matches.value_of("db").unwrap();
-    let base_cfg = matches.value_of("base_cfg").unwrap();
-    let tuning_cfg = matches.value_of("tuning_cfg").unwrap();
-    let (opt_db, opt_cf) = try!(dbcfg::get_db_config(base_cfg, tuning_cfg));
+    let cfg = matches.value_of("cfg").unwrap();
+    let (opt_db, opt_cf) = try!(dbcfg::get_db_config(cfg));
     let db = try!(DB::open_cf(opt_db, db_path, &["default"], &[&opt_cf]));
 
     let count = matches.value_of("count").unwrap();
