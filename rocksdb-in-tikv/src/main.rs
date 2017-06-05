@@ -80,7 +80,7 @@ fn run() -> Result<usize, String> {
             match cf.subcommand_name() {
                 Some("data") => sim::cf::cf_default_w(db),
                 Some("lock") => sim::cf::cf_lock_w(db,
-                    &mut key::RepeatKeyGen::new(b"test-key", count),
+                    &mut key::IncreaseKeyGen::new(&vec![0; 32], count),
                     &mut val::ConstValGen::new(b"test-val")),
                 Some("commit") => sim::cf::cf_write_w(db),
                 Some("raft") => sim::cf::cf_raft_w(db),

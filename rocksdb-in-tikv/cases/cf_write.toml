@@ -34,6 +34,4 @@ cache-index-and-filter-blocks = true
 level0-file-num-compaction-trigger = 4
 level0-slowdown-writes-trigger = 20
 level0-stop-writes-trigger = 36
-cache-index-and-filter-blocks = true
-
 block-cache-size = "256MB"

@@ -1,4 +1,5 @@
-100000 cases/cf_data.toml   cf lock
-100000 cases/cf_lock.toml   cf lock
-100000 cases/cf_commit.toml cf lock
-100000 cases/cf_raft.toml   cf lock
+500000 1000000 cases/cf_lock.toml cf lock
+500000 1000000 cases/cf_lock.toml cf lock
+500000 1000000 cases/cf_lock.toml cf lock
+500000 1000000 cases/cf_lock.toml cf lock
+500000 1000000 cases/cf_lock.toml cf lock

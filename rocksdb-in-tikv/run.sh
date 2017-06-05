@@ -41,21 +41,29 @@ function logi() {
 
 while read line; do
 	ts="#`date +%s`""`date +%N`"
-	cnt=`echo "$line" | awk '{print $1}'`
-	cfg=`echo "$line" | awk '{print $2}'`
-	rest=`echo "$line" | awk '{for(i=3;i<=NF;i++)printf $i" ";}'`
-	echo "start: $cfg1 + $cfg2" | logt | logi $ts | tee -a $log
-	cat $cfg1  | logi $ts >> $log
-	echo "---" | logi $ts >> $log
-	cat $cfg2  | logi $ts >> $log
-	echo "---" | logi $ts >> $log
-	"$bin" nosyscheck -d $db -n $cnt -c $cfg1 -t $cfg2 $rest | logt | logi $ts | tee -a $log
+	precnt=`echo "$line" | awk '{print $1}'`
+	cnt=`echo "$line" | awk '{print $2}'`
+	cfg=`echo "$line" | awk '{print $3}'`
+	rest=`echo "$line" | awk '{for(i=4;i<=NF;i++)printf $i" ";}'`
+
+	rm -rf "$db"
+
+	echo "start: $cfg" | logt | logi $ts | tee -a $log
+	"$bin" nosyscheck -d $db -n $precnt -c $cfg $rest | logi "prewrite: " | logt | logi $ts | tee -a $log
 	if [ $? != 0 ]; then
+		echo "run failed" >&2
+		exit 1
+	fi
+
+	cat $cfg  | logi $ts >> $log
+	"$bin" nosyscheck -d $db -n $cnt -c $cfg $rest | logi "result: " | logt | logi $ts | tee -a $log
+	if [ $? != 0 ]; then
+		echo "run failed" >&2
 		exit 1
 	fi
 done < $plan
 
-fastest=`cat $log | grep 'tps:' | awk '{print $NF" "$1}' | sort -nrk 1 | head -n 1`
+fastest=`cat $log | grep "result" | grep 'tps:' | awk '{print $NF" "$1}' | sort -nrk 1 | head -n 1`
 if [ -z "$fastest" ]; then
 	exit 1
 fi
@@ -63,6 +71,6 @@ fi
 speed=`echo "$fastest" | awk '{print $1}'`
 ts=`echo "$fastest" | awk '{print $2}'`
 
-cfg=`cat $log | grep "$ts" | grep "start: " | awk '{for(i=NF-2;i<=NF;i++)printf $i" ";}'`
+cfg=`cat $log | grep "$ts" | grep "start: " | awk '{print $NF}'`
 echo
 echo "fastest: $ts, tps: $speed, config as: $cfg"

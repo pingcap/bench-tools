@@ -34,26 +34,44 @@ impl KeyGen for RepeatKeyGen {
         if self.cnt > 0 {
             self.cnt -= 1;
             Some(&self.key)
-        } else if self.cnt == 0 {
-            None
         } else {
-            Some(&self.key)
+            None
         }
     }
 }
 
-// pub struct IncreaseKeyGen {
-//    curr: &[u8]
-// }
+pub struct IncreaseKeyGen {
+    key: Vec<u8>,
+    cnt: usize,
+}
 
-// impl Iterator for IncreaseKeyGen {
-//    fn next(&mut self) -> Option<&[u8]> {
-//        None
-//    }
-// }
+impl IncreaseKeyGen {
+    pub fn new(key: &[u8], cnt: usize) -> IncreaseKeyGen {
+        IncreaseKeyGen {
+            key: key.to_vec(),
+            cnt: cnt,
+        }
+    }
+    fn key_inc(&mut self) {
+        let mut n = self.key.len();
+        while n > 0 {
+            self.key[n - 1] += 1;
+            if self.key[n - 1] != 0 {
+                break;
+            }
+            n -= 1;
+        }
+    }
+}
 
-// impl IncreaseKeyGen {
-//    pub fn new(key_len: usize) -> IncreaseKeyGen {
-//        IncreaseKeyGen{curr: b"test"}
-//    }
-// }
+impl KeyGen for IncreaseKeyGen {
+    fn next(&mut self) -> Option<&[u8]> {
+        if self.cnt > 0 {
+            self.cnt -= 1;
+            self.key_inc();
+            Some(&self.key)
+        } else {
+            None
+        }
+    }
+}
