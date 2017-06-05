@@ -50,9 +50,13 @@ fn run() -> Result<usize, String> {
             .help("skip system check")
             .required(false))
         .subcommand(SubCommand::with_name("cf")
-            .subcommand(SubCommand::with_name("data"))
-            .subcommand(SubCommand::with_name("lock"))
-            .subcommand(SubCommand::with_name("commit"))
+            .subcommand(SubCommand::with_name("default"))
+            .subcommand(SubCommand::with_name("lock")
+                .arg(Arg::with_name("keygen")
+                .short("k")
+                .help("key generator")
+                .required(false)))
+            .subcommand(SubCommand::with_name("write"))
             .subcommand(SubCommand::with_name("raft")))
         .subcommand(SubCommand::with_name("txn"));
 
@@ -77,13 +81,18 @@ fn run() -> Result<usize, String> {
 
     let res = match matches.subcommand() {
         ("cf", Some(cf)) => {
-            match cf.subcommand_name() {
-                Some("data") => sim::cf::cf_default_w(db),
-                Some("lock") => sim::cf::cf_lock_w(db,
-                    &mut key::IncreaseKeyGen::new(&vec![0; 32], count),
-                    &mut val::ConstValGen::new(b"test-val")),
-                Some("commit") => sim::cf::cf_write_w(db),
-                Some("raft") => sim::cf::cf_raft_w(db),
+            match cf.subcommand() {
+                ("default", Some(_)) => sim::cf::cf_default_w(db),
+                ("lock", Some(cf_t)) => match cf_t.value_of("keygen") {
+                    Some("repeat") => sim::cf::cf_lock_w(db,
+                        &mut key::RepeatKeyGen::new(&vec![0; 32], count),
+                        &mut val::ConstValGen::new(&vec![0; 8])),
+                    _ => sim::cf::cf_lock_w(db,
+                        &mut key::IncreaseKeyGen::new(&vec![0; 32], count),
+                        &mut val::ConstValGen::new(&vec![0; 8])),
+                },
+                ("write", Some(_)) => sim::cf::cf_write_w(db),
+                ("raft", Some(_)) => sim::cf::cf_raft_w(db),
                 _ => help_err(app)
             }
         }
