@@ -44,11 +44,11 @@ while read line; do
 	rm -rf "$db"
 
 	echo "start: $cfg" | logt | logi $ts | tee -a $log
-	$bin nosyscheck -d $db -n $precnt -c $cfg $rest | logi "prewrite: " | logt | logi $ts | tee -a $log
+	$bin -N -d $db -n $precnt -c $cfg $rest | logi "prewrite: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
 	
 	cat $cfg | logi "$ts ------>" >> $log
-	$bin nosyscheck -d $db -n $cnt -c $cfg $rest | logi "result: " | logt | logi $ts | tee -a $log
+	$bin -N -d $db -n $cnt -c $cfg $rest | logi "result: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
 done < $plan
 
