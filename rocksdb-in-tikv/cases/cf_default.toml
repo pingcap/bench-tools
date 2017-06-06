@@ -23,7 +23,7 @@ stats-dump-period-sec = 600
 # rate-bytes-per-sec = 0
 
 [rocksdb.cf]
-compression-per-level = "no:no:lz4:lz4:lz4:zstd:zstd"
+compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 block-size = "64KB"
 level0-file-num-compaction-trigger = 4
 level0-slowdown-writes-trigger = 20

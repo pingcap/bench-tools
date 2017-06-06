@@ -3,22 +3,9 @@
 set -eo pipefail
 trap "Fail unexpectedly on line \$LINENO!" ERR
 
-HL_RED="\e[31;1m"
-HL_GREEN="\e[32;1m"
-HL_YELLOW="\e[33;1m"
-HL_BLUE="\e[34;1m"
-NORMAL="\e[0m"
-hl_red()    { echo -e "$HL_RED""$@""$NORMAL" >&2; }
-hl_green()  { echo -e "$HL_GREEN""$@""$NORMAL" >&2; }
-hl_yellow() { echo -e "$HL_YELLOW""$@""$NORMAL" >&2; }
-hl_blue()   { echo -e "$HL_BLUE""$@""$NORMAL" >&2; }
-trace() { hl_blue "--> $@"; }
-notice() { hl_green "==> NOTICE: $@"; }
-warning() { hl_yellow "==> WARNING: $@"; }
-fatal() { hl_red "==> ERROR: $@"; exit 1; }
-
+fatal() { echo $@; exit 1; }
 usage() {
-	hl_red "Usage: $0 <bin-file> <test-plan> [db_path]" && exit 1
+	fatal "Usage: $0 <bin-file> <test-plan> [db_path]"
 }
 
 bin="$1"
@@ -29,6 +16,7 @@ if [[ -z $bin || -z $plan ]]; then
 	usage
 fi
 [[ -n $db ]] || db_pfx="rocksdb_test"
+log=$db_pfx.log
 
 logt() {
 	date=$(date +'%H:%M:%S')
@@ -43,12 +31,11 @@ logi() {
 }
 
 cat $plan | grep -v '^#' | while read line; do
-	trace "---------------------------------------------------------------------------------------------"
+	echo "################################################################## new task ##################################################################" | tee -a $log
 	rand=$(date +'%N')
 	ts="#$(date +'%s').$rand"
 	db="$db_pfx.$rand"
-	log=$db.log
-	rm -rf $db $log
+	rm -rf $db
 
 	config=$(echo "$line" | awk '{print $1}')
 	warmup_cnt=$(echo "$line" | awk '{print $2'})
@@ -60,11 +47,11 @@ cat $plan | grep -v '^#' | while read line; do
 	sub_cmd=$(echo $line | awk '{ for(i=8; i<=NF; i++) printf $i" "; }')
 
 	echo "start: $config" | logt | logi $ts | tee -a $log
-	cat $config | logi "$ts $config" >> $log
+	cat $config | logi $config | logt | logi $ts >> $log
+	
 	$bin -N -d $db -c $config -n $warmup_cnt -K $key_len -V $val_len -B $batch_size -k $key_gen $sub_cmd | logi "warmup: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
 
-	cat $config | logi "$ts ------>" >> $log
 	$bin -N -d $db -c $config -n $bench_cnt -K $key_len -V $val_len -B $batch_size -k $key_gen $sub_cmd | logi "result: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
 done
