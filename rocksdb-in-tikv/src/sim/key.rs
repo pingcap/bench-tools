@@ -97,6 +97,7 @@ impl RandomKeyGen {
 impl KeyGen for RandomKeyGen {
     fn next(&mut self) -> Option<&[u8]> {
         if self.cnt > 0 {
+            self.cnt -= 1;
             thread_rng().fill_bytes(&mut self.key);
             Some(&self.key)
         } else {
