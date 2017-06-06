@@ -48,37 +48,45 @@ fn run() -> Result<usize, String> {
             .help("skip system check")
             .required(false))
         .arg(Arg::with_name("db_path")
-            .short("db")
+            .short("d")
+            .long("db")
             .takes_value(true)
             .help("rocksdb path")
             .required(true))
         .arg(Arg::with_name("config")
             .short("c")
+            .long("config")
             .takes_value(true)
             .help("toml config file")
             .required(true))
         .arg(Arg::with_name("count")
             .short("n")
+            .long("count")
             .takes_value(true)
             .help("request count")
             .required(true))
         .arg(Arg::with_name("key_len")
             .short("K")
             .long("key_len")
+            .takes_value(true)
             .help("set key len")
             .required(false))
         .arg(Arg::with_name("val_len")
             .short("V")
             .long("val_len")
+            .takes_value(true)
             .help("set value len")
             .required(false))
         .arg(Arg::with_name("batch_size")
             .short("B")
             .long("batch_size")
+            .takes_value(true)
             .help("set batch size")
             .required(false))
         .arg(Arg::with_name("key_gen")
             .short("k")
+            .long("key_gen")
+            .takes_value(true)
             .help("key generator, [repeat, increase, random]")
             .default_value("random")
             .required(false))
@@ -193,17 +201,17 @@ fn main() {
     let timer = Instant::now();
     match run() {
         Err(e) => {
-            print!("{}\n", e);
+            println!("{}", e);
             process::exit(1)
         }
         Ok(count) => {
             let elapsed = timer.elapsed();
             let tps = count as f64 /
                       (elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1e9);
-            print!("invoke {} times in {} ms, tps: {}\n",
-                   count,
-                   elapsed.as_secs() * 1000 + (elapsed.subsec_nanos() as f64 / 1e6) as u64,
-                   tps as u64);
+            println!("invoke {} times in {} ms, tps: {}",
+                     count,
+                     elapsed.as_secs() * 1000 + (elapsed.subsec_nanos() as f64 / 1e6) as u64,
+                     tps as u64);
         }
     };
 }

@@ -1,2 +1,3 @@
-500000 1000000 cases/cf_lock.toml cf lock
-500000 1000000 cases/cf_lock.toml cf lock
+# config, warmup_cnt, bench_cnt, key_len, val_len, batch_size, key_gen, bench_mode, cf
+cases/cf_lock.toml 5000 10000 32 128 256 random cf lock
+cases/cf_default.toml 5000 10000 32 128 256 random cf default

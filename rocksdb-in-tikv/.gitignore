@@ -1,4 +1,3 @@
 bin
 target
-rocksdb_test
-rocksdb_test.log
+rocksdb_test*

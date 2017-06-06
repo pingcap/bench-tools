@@ -17,20 +17,18 @@ notice() { hl_green "==> NOTICE: $@"; }
 warning() { hl_yellow "==> WARNING: $@"; }
 fatal() { hl_red "==> ERROR: $@"; exit 1; }
 
+usage() {
+	hl_red "Usage: $0 <bin-file> <test-plan> [db_path]" && exit 1
+}
+
 bin="$1"
 plan="$2"
-log="$3"
-db="$4"
-
-usage() {
-	hl_red "Usage: $0 <bin-file> <test-plan> [log-file] [db-path]" && exit 1
-}
+db_pfx="$3"
 
 if [[ -z $bin || -z $plan ]]; then
 	usage
 fi
-[[ -n $log ]] || log="rocksdb_test.log"
-[[ -n $db ]] || db="rocksdb_test"
+[[ -n $db ]] || db_pfx="rocksdb_test"
 
 logt() {
 	date=$(date +'%H:%M:%S')
@@ -44,29 +42,37 @@ logi() {
 	done
 }
 
-while read line; do
+cat $plan | grep -v '^#' | while read line; do
 	trace "---------------------------------------------------------------------------------------------"
-	ts="#$(date +'%s%N')"
-	precnt=`echo "$line" | awk '{print $1}'`
-	cnt=`echo "$line" | awk '{print $2}'`
-	cfg=`echo "$line" | awk '{print $3}'`
-	rest=`echo "$line" | awk '{ for(i=4; i<=NF; i++) printf $i" ";}'`
+	rand=$(date +'%N')
+	ts="#$(date +'%s').$rand"
+	db="$db_pfx.$rand"
+	log=$db.log
+	rm -rf $db $log
 
-	rm -rf "$db"
+	config=$(echo "$line" | awk '{print $1}')
+	warmup_cnt=$(echo "$line" | awk '{print $2'})
+	bench_cnt=$(echo "$line" | awk '{print $3}')
+	key_len=$(echo $line | awk '{print $4}')
+	val_len=$(echo $line | awk '{print $5}')
+	batch_size=$(echo $line | awk '{print $6}')
+	key_gen=$(echo $line | awk '{print $7}')
+	sub_cmd=$(echo $line | awk '{ for(i=8; i<=NF; i++) printf $i" "; }')
 
-	echo "start: $cfg" | logt | logi $ts | tee -a $log
-	$bin -N -d $db -n $precnt -c $cfg $rest | logi "prewrite: " | logt | logi $ts | tee -a $log
+	echo "start: $config" | logt | logi $ts | tee -a $log
+	cat $config | logi "$ts $config" >> $log
+	$bin -N -d $db -c $config -n $warmup_cnt -K $key_len -V $val_len -B $batch_size -k $key_gen $sub_cmd | logi "warmup: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
-	
-	cat $cfg | logi "$ts ------>" >> $log
-	$bin -N -d $db -n $cnt -c $cfg $rest | logi "result: " | logt | logi $ts | tee -a $log
+
+	cat $config | logi "$ts ------>" >> $log
+	$bin -N -d $db -c $config -n $bench_cnt -K $key_len -V $val_len -B $batch_size -k $key_gen $sub_cmd | logi "result: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
-done < $plan
+done
 
 
 fastest=`cat $log | grep "result" | grep 'tps:' | awk '{print $1" "$NF}' | sort -nrk 2 | head -n 1`
 ts=`echo "$fastest" | awk '{print $1}'`
 speed=`echo "$fastest" | awk '{print $2}'`
-cfg=`cat $log | grep "$ts" | grep "start: " | awk '{print $NF}'`
+config=`cat $log | grep "$ts" | grep "start: " | awk '{print $NF}'`
 echo
-echo "fastest: $ts, tps: $speed, config as: $cfg"
+echo "fastest: $ts, tps: $speed, config as: $config"
