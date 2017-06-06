@@ -160,8 +160,8 @@ fn run() -> Result<usize, String> {
             match cf.subcommand_name().unwrap() {
                 "default" => cf_default_w(&db, &mut *key_gen, &mut val_gen, batch_size),
                 "lock" => cf_lock_w(&db, &mut *key_gen, &mut val_gen, batch_size),
-                "write" => cf_write_w(&db),
-                "raft" => cf_raft_w(&db),
+                "write" => cf_write_w(&db, &mut *key_gen, &mut val_gen, batch_size),
+                "raft" => cf_raft_w(&db, &mut *key_gen, &mut val_gen, batch_size),
                 _ => help_err(app),
             }
         }

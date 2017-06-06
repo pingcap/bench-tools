@@ -15,12 +15,3 @@ pub mod key;
 pub mod val;
 pub mod cf;
 pub mod txn;
-
-use rand::{Rng, thread_rng};
-
-#[inline]
-pub fn gen_rand_str(len: usize) -> Vec<u8> {
-    let mut rand_str = vec![0; len];
-    thread_rng().fill_bytes(&mut rand_str);
-    rand_str
-}

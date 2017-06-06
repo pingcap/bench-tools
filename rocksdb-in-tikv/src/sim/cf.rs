@@ -25,21 +25,14 @@ pub fn cf_default_w(db: &DB,
     loop {
         let wb = WriteBatch::new();
         for _ in 0..batch_size {
-            let key = match keys.next() {
-                Some(v) => v,
-                _ => {
-                    finish = true;
-                    break;
+            if let Some(key) = keys.next() {
+                if let Some(val) = vals.next() {
+                    try!(wb.put(key, val));
                 }
-            };
-            let val = match vals.next() {
-                Some(v) => v,
-                _ => {
-                    finish = true;
-                    break;
-                }
-            };
-            try!(wb.put(key, val));
+            } else {
+                finish = true;
+                break;
+            }
         }
 
         try!(db.write(wb));
@@ -60,25 +53,17 @@ pub fn cf_lock_w(db: &DB,
         let wb_put = WriteBatch::new();
         let wb_del = WriteBatch::new();
         for _ in 0..batch_size {
-            let key = match keys.next() {
-                Some(v) => v,
-                _ => {
-                    finish = true;
-                    break;
+            if let Some(key) = keys.next() {
+                if let Some(val) = vals.next() {
+                    try!(wb_put.put(key, val));
+                    try!(wb_del.delete(key));
                 }
-            };
-            let val = match vals.next() {
-                Some(v) => v,
-                _ => {
-                    finish = true;
-                    break;
-                }
-            };
-            try!(wb_put.put(key, val));
-            try!(wb_del.delete(key));
+            } else {
+                finish = true;
+                break;
+            }
         }
 
-        
         try!(db.write(wb_put));
         try!(db.write(wb_del));
         if finish {
@@ -88,12 +73,18 @@ pub fn cf_lock_w(db: &DB,
     Ok(())
 }
 
-pub fn cf_write_w(db: &DB) -> Result<(), String> {
-    let _ = db;
-    Err("not impl: cf_raft_w".to_string())
+pub fn cf_write_w(db: &DB,
+                  keys: &mut KeyGen,
+                  vals: &mut ValGen,
+                  batch_size: usize)
+                  -> Result<(), String> {
+    cf_default_w(db, keys, vals, batch_size)
 }
 
-pub fn cf_raft_w(db: &DB) -> Result<(), String> {
-    let _ = db;
-    Err("not impl: cf_raft_w".to_string())
+pub fn cf_raft_w(db: &DB,
+                 keys: &mut KeyGen,
+                 vals: &mut ValGen,
+                 batch_size: usize)
+                 -> Result<(), String> {
+    cf_default_w(db, keys, vals, batch_size)
 }
