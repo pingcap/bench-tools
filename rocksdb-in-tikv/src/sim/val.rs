@@ -23,7 +23,7 @@ pub struct ConstValGen {
 
 impl ConstValGen {
     pub fn new(len: usize) -> ConstValGen {
-        let mut vals = ConstValGen { val: Vec::with_capacity(len) };
+        let mut vals = ConstValGen { val: vec![0; len] };
         thread_rng().fill_bytes(&mut vals.val);
         vals
     }
@@ -32,5 +32,19 @@ impl ConstValGen {
 impl ValGen for ConstValGen {
     fn next(&mut self) -> Option<&[u8]> {
         Some(&self.val)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{ValGen, ConstValGen};
+
+    #[test]
+    fn test_const_valgen() {
+        let mut vg = ConstValGen::new(8);
+        for _ in 0..8 {
+            let val = vg.next().expect("");
+            println!("{:?}", val);
+        }
     }
 }
