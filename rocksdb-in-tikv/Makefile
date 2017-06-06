@@ -27,5 +27,8 @@ release:
 	@mkdir -p ${BIN_PATH}
 	cp -f ${CARGO_TARGET_DIR}/release/rocksdb-in-tikv ${BIN_PATH}/
 
+test:
+	RUST_BACKTRACE=1 cargo test -- --nocapture
+
 clean:
 	cargo clean

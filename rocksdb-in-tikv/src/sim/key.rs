@@ -25,7 +25,7 @@ pub struct RepeatKeyGen {
 impl RepeatKeyGen {
     pub fn new(len: usize, cnt: usize) -> RepeatKeyGen {
         let mut keys = RepeatKeyGen {
-            key: Vec::with_capacity(len),
+            key: vec![0; len],
             cnt: cnt,
         };
         thread_rng().fill_bytes(&mut keys.key);
@@ -52,7 +52,7 @@ pub struct IncreaseKeyGen {
 impl IncreaseKeyGen {
     pub fn new(len: usize, cnt: usize) -> IncreaseKeyGen {
         IncreaseKeyGen {
-            key: Vec::with_capacity(len),
+            key: vec![0; len],
             cnt: cnt,
         }
     }
@@ -88,7 +88,7 @@ pub struct RandomKeyGen {
 impl RandomKeyGen {
     pub fn new(len: usize, cnt: usize) -> RandomKeyGen {
         RandomKeyGen {
-            key: Vec::with_capacity(len),
+            key: vec![0; len],
             cnt: cnt,
         }
     }
@@ -102,6 +102,35 @@ impl KeyGen for RandomKeyGen {
             Some(&self.key)
         } else {
             None
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen};
+
+    #[test]
+    fn test_repeate_keygen() {
+        let mut kg = RepeatKeyGen::new(8, 8);
+        while let Some(key) = kg.next() {
+            println!("{:?}", key);
+        }
+    }
+
+    #[test]
+    fn test_increase_keygen() {
+        let mut kg = IncreaseKeyGen::new(8, 8);
+        while let Some(key) = kg.next() {
+            println!("{:?}", key);
+        }
+    }
+
+    #[test]
+    fn test_random_keygen() {
+        let mut kg = RandomKeyGen::new(8, 8);
+        while let Some(key) = kg.next() {
+            println!("{:?}", key);
         }
     }
 }
