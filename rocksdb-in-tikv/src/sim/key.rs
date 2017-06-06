@@ -23,11 +23,13 @@ pub struct RepeatKeyGen {
 }
 
 impl RepeatKeyGen {
-    pub fn new(key: &[u8], cnt: usize) -> RepeatKeyGen {
-        RepeatKeyGen {
-            key: key.to_vec(),
+    pub fn new(len: usize, cnt: usize) -> RepeatKeyGen {
+        let mut keys = RepeatKeyGen {
+            key: Vec::with_capacity(len),
             cnt: cnt,
-        }
+        };
+        thread_rng().fill_bytes(&mut keys.key);
+        keys
     }
 }
 
@@ -48,9 +50,9 @@ pub struct IncreaseKeyGen {
 }
 
 impl IncreaseKeyGen {
-    pub fn new(key: &[u8], cnt: usize) -> IncreaseKeyGen {
+    pub fn new(len: usize, cnt: usize) -> IncreaseKeyGen {
         IncreaseKeyGen {
-            key: key.to_vec(),
+            key: Vec::with_capacity(len),
             cnt: cnt,
         }
     }
@@ -84,9 +86,9 @@ pub struct RandomKeyGen {
 }
 
 impl RandomKeyGen {
-    pub fn new(size: usize, cnt: usize) -> RandomKeyGen {
+    pub fn new(len: usize, cnt: usize) -> RandomKeyGen {
         RandomKeyGen {
-            key: Vec::with_capacity(size),
+            key: Vec::with_capacity(len),
             cnt: cnt,
         }
     }

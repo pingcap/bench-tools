@@ -13,8 +13,8 @@
 
 use rocksdb::{DB, WriteBatch, Writable};
 
-use super::key::*;
-use super::val::*;
+use super::key::KeyGen;
+use super::val::ValGen;
 
 pub fn cf_default_w(db: DB,
                     keys: &mut KeyGen,

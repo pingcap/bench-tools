@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use rand::{Rng, thread_rng};
+
 pub trait ValGen {
     fn next(&mut self) -> Option<&[u8]>;
 }
@@ -20,8 +22,10 @@ pub struct ConstValGen {
 }
 
 impl ConstValGen {
-    pub fn new(val: &[u8]) -> ConstValGen {
-        ConstValGen { val: val.to_vec() }
+    pub fn new(len: usize) -> ConstValGen {
+        let mut vals = ConstValGen { val: Vec::with_capacity(len) };
+        thread_rng().fill_bytes(&mut vals.val);
+        vals
     }
 }
 

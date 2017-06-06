@@ -27,7 +27,11 @@ mod env;
 use env::dbcfg;
 use sim::key::{RepeatKeyGen, IncreaseKeyGen, RandomKeyGen};
 use sim::val::ConstValGen;
-use sim::{cf, gen_rand_str};
+use sim::cf;
+
+const KEY_LEN: usize = 32;
+const VALUE_LEN: usize = 128;
+const BATCH_SIZE: usize = 128;
 
 fn run() -> Result<usize, String> {
     let app = App::new("Rocksdb in TiKV")
@@ -85,25 +89,24 @@ fn run() -> Result<usize, String> {
         ("cf", Some(cf)) => {
             match cf.subcommand() {
                 ("default", Some(_)) => {
-                    let value = gen_rand_str(128);
                     cf::cf_default_w(db,
-                                     &mut RandomKeyGen::new(30, 1000),
-                                     &mut ConstValGen::new(&value),
-                                     128)
+                                     &mut RandomKeyGen::new(KEY_LEN, count),
+                                     &mut ConstValGen::new(VALUE_LEN),
+                                     BATCH_SIZE)
                 }
                 ("lock", Some(cf_t)) => {
                     match cf_t.value_of("keygen") {
                         Some("repeat") => {
                             cf::cf_lock_w(db,
-                                          &mut RepeatKeyGen::new(&vec![0; 32], count),
-                                          &mut ConstValGen::new(&vec![0; 8]),
-                                          128)
+                                          &mut RepeatKeyGen::new(KEY_LEN, count),
+                                          &mut ConstValGen::new(VALUE_LEN),
+                                          BATCH_SIZE)
                         }
                         _ => {
                             cf::cf_lock_w(db,
-                                          &mut IncreaseKeyGen::new(&vec![0; 32], count),
-                                          &mut ConstValGen::new(&vec![0; 8]),
-                                          128)
+                                          &mut RandomKeyGen::new(KEY_LEN, count),
+                                          &mut ConstValGen::new(VALUE_LEN),
+                                          BATCH_SIZE)
                         }
                     }
                 }
