@@ -3,17 +3,27 @@
 set -eo pipefail
 trap "Fail unexpectedly on line \$LINENO!" ERR
 
+HL_RED="\e[31;1m"
+HL_GREEN="\e[32;1m"
+HL_YELLOW="\e[33;1m"
+HL_BLUE="\e[34;1m"
+NORMAL="\e[0m"
+hl_red()    { echo -e "$HL_RED""$@""$NORMAL" >&2; }
+hl_green()  { echo -e "$HL_GREEN""$@""$NORMAL" >&2; }
+hl_yellow() { echo -e "$HL_YELLOW""$@""$NORMAL" >&2; }
+hl_blue()   { echo -e "$HL_BLUE""$@""$NORMAL" >&2; }
+trace() { hl_blue "--> $@"; }
+notice() { hl_green "==> NOTICE: $@"; }
+warning() { hl_yellow "==> WARNING: $@"; }
+fatal() { hl_red "==> ERROR: $@"; exit 1; }
+
 bin="$1"
 plan="$2"
 log="$3"
 db="$4"
 
-trace() { echo "--> $@";}
-notice() { echo "==> NOTICE: $@";}
-warning() { echo "==> WARNING: $@";}
-fatal() { echo "==> FATAL: $@"; exit 1;}
 usage() {
-	fatal "Usage: <run> \$bin-file \$test-plan [\$log-file] [\$db-path]"
+	hl_red "Usage: $0 <bin-file> <test-plan> [log-file] [db-path]" && exit 1
 }
 
 if [[ -z $bin || -z $plan ]]; then
@@ -23,8 +33,9 @@ fi
 [[ -n $db ]] || db="rocksdb_test"
 
 logt() {
+	date=$(date +'%H:%M:%S')
 	while read line; do
-		echo "[$(date +'%H:%M:%S')] $line"
+		echo "[$date] $line"
 	done
 }
 logi() {
@@ -34,7 +45,7 @@ logi() {
 }
 
 while read line; do
-	echo "---------------------------------------------------------------------------------"
+	trace "---------------------------------------------------------------------------------------------"
 	ts="#$(date +'%s%N')"
 	precnt=`echo "$line" | awk '{print $1}'`
 	cnt=`echo "$line" | awk '{print $2}'`

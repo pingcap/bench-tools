@@ -16,7 +16,7 @@ use rocksdb::{DB, WriteBatch, Writable};
 use super::key::KeyGen;
 use super::val::ValGen;
 
-pub fn cf_default_w(db: DB,
+pub fn cf_default_w(db: &DB,
                     keys: &mut KeyGen,
                     vals: &mut ValGen,
                     batch_size: usize)
@@ -50,7 +50,7 @@ pub fn cf_default_w(db: DB,
     Ok(())
 }
 
-pub fn cf_lock_w(db: DB,
+pub fn cf_lock_w(db: &DB,
                  keys: &mut KeyGen,
                  vals: &mut ValGen,
                  batch_size: usize)
@@ -88,12 +88,12 @@ pub fn cf_lock_w(db: DB,
     Ok(())
 }
 
-pub fn cf_write_w(db: DB) -> Result<(), String> {
+pub fn cf_write_w(db: &DB) -> Result<(), String> {
     let _ = db;
     Err("not impl: cf_raft_w".to_string())
 }
 
-pub fn cf_raft_w(db: DB) -> Result<(), String> {
+pub fn cf_raft_w(db: &DB) -> Result<(), String> {
     let _ = db;
     Err("not impl: cf_raft_w".to_string())
 }

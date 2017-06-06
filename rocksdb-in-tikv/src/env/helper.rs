@@ -11,8 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::process;
 use toml;
-use process;
 
 const UNIT: usize = 1;
 const DATA_MAGNITUDE: usize = 1024;

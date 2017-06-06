@@ -35,6 +35,9 @@ const DEFAULT_KEY_LEN: usize = 32;
 const DEFAULT_VALUE_LEN: usize = 128;
 const DEFAULT_BATCH_SIZE: usize = 128;
 
+const ROCKSDB_DB_STATS_KEY: &'static str = "rocksdb.dbstats";
+const ROCKSDB_CF_STATS_KEY: &'static str = "rocksdb.cfstats";
+
 fn run() -> Result<usize, String> {
     let app = App::new("Rocksdb in TiKV")
         .author("PingCAP")
@@ -100,31 +103,39 @@ fn run() -> Result<usize, String> {
     let db = try!(DB::open_cf(opt_db, db_path, &["default"], &[&opt_cf]));
 
     let count = match matches.value_of("count") {
-        Some(v) => match v.parse() {
-            Ok(v) => v,
-            Err(count) => return Err(format!("{} is not a number", count)),
-        },
+        Some(v) => {
+            match v.parse() {
+                Ok(v) => v,
+                Err(count) => return Err(format!("{} is not a number", count)),
+            }
+        }
         None => DEFAULT_KEY_LEN,
     };
     let key_len = match matches.value_of("key_len") {
-        Some(v) => match v.parse() {
-            Ok(v) => v,
-            Err(key_len) => return Err(format!("{} is not a number", key_len)),
-        },
+        Some(v) => {
+            match v.parse() {
+                Ok(v) => v,
+                Err(key_len) => return Err(format!("{} is not a number", key_len)),
+            }
+        }
         None => DEFAULT_VALUE_LEN,
     };
     let val_len = match matches.value_of("val_len") {
-        Some(v) => match v.parse() {
-            Ok(v) => v,
-            Err(val_len) => return Err(format!("{} is not a number", val_len)),
-        },
+        Some(v) => {
+            match v.parse() {
+                Ok(v) => v,
+                Err(val_len) => return Err(format!("{} is not a number", val_len)),
+            }
+        }
         None => DEFAULT_VALUE_LEN,
     };
     let batch_size = match matches.value_of("batch_size") {
-        Some(v) => match v.parse() {
-            Ok(v) => v,
-            Err(batch_size) => return Err(format!("{} is not a number", batch_size)),
-        }, 
+        Some(v) => {
+            match v.parse() {
+                Ok(v) => v,
+                Err(batch_size) => return Err(format!("{} is not a number", batch_size)),
+            }
+        } 
         None => DEFAULT_BATCH_SIZE,
     };
 
@@ -139,10 +150,10 @@ fn run() -> Result<usize, String> {
     let res = match matches.subcommand() {
         ("cf", Some(cf)) => {
             match cf.subcommand_name().unwrap() {
-                "default" => cf_default_w(db, &mut *key_gen, &mut val_gen, batch_size),
-                "lock" => cf_lock_w(db, &mut *key_gen, &mut val_gen, batch_size),
-                "write" => cf_write_w(db),
-                "raft" => cf_raft_w(db),
+                "default" => cf_default_w(&db, &mut *key_gen, &mut val_gen, batch_size),
+                "lock" => cf_lock_w(&db, &mut *key_gen, &mut val_gen, batch_size),
+                "write" => cf_write_w(&db),
+                "raft" => cf_raft_w(&db),
                 _ => help_err(app),
             }
         }
@@ -151,6 +162,8 @@ fn run() -> Result<usize, String> {
         }
         _ => help_err(app),
     };
+
+    output_stats(&db);
 
     match res {
         Ok(_) => Ok(count),
@@ -162,6 +175,18 @@ fn help_err(app: clap::App) -> Result<(), String> {
     let mut help = Vec::new();
     app.write_help(&mut help).unwrap();
     Err(String::from_utf8(help).unwrap())
+}
+
+fn output_stats(db: &DB) {
+    if let Some(db_stats) = db.get_property_value(ROCKSDB_DB_STATS_KEY) {
+        print!("{}", db_stats);
+    }
+    for name in db.cf_names() {
+        let handler = db.cf_handle(name).expect("");
+        if let Some(cf_stats) = db.get_property_value_cf(handler, ROCKSDB_CF_STATS_KEY) {
+            print!("{}", cf_stats);
+        }
+    }
 }
 
 fn main() {
