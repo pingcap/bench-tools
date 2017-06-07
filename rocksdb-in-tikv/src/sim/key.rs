@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{Rng, thread_rng};
+use rand::{Rng, SeedableRng, XorShiftRng, thread_rng};
 
 pub trait KeyGen {
     fn next(&mut self) -> Option<&[u8]>;
@@ -83,6 +83,7 @@ impl KeyGen for IncreaseKeyGen {
 pub struct RandomKeyGen {
     key: Vec<u8>,
     cnt: usize,
+    rand: XorShiftRng,
 }
 
 impl RandomKeyGen {
@@ -90,6 +91,7 @@ impl RandomKeyGen {
         RandomKeyGen {
             key: vec![0; len],
             cnt: cnt,
+            rand: XorShiftRng::from_seed([1; 4]),
         }
     }
 }
@@ -98,7 +100,7 @@ impl KeyGen for RandomKeyGen {
     fn next(&mut self) -> Option<&[u8]> {
         if self.cnt > 0 {
             self.cnt -= 1;
-            thread_rng().fill_bytes(&mut self.key);
+            self.rand.fill_bytes(&mut self.key);
             Some(&self.key)
         } else {
             None
