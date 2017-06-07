@@ -1,0 +1,3 @@
+# config, warmup_cnt, bench_cnt, key_len, val_len, batch_size, key_gen, bench_mode, cf
+cases/_default.toml 5000 10000 32 128 256 random cf default
+cases/cf_lock.toml 5000 10000 32 128 256 random cf lock
