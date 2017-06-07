@@ -15,7 +15,8 @@ use std::process;
 use std::fs::File;
 use std::io::Read;
 use toml;
-use rocksdb::{Options as RocksdbOptions, BlockBasedOptions, DBCompressionType, DBRecoveryMode};
+use rocksdb::{Options as RocksdbOptions, BlockBasedOptions, DBCompressionType, CompactionPriority,
+              DBRecoveryMode};
 use super::helper::{get_toml_boolean, get_toml_int, get_toml_string};
 
 const SEC_TO_MS: i64 = 1000;
@@ -59,6 +60,16 @@ fn parse_rocksdb_wal_recovery_mode(mode: i64) -> Result<DBRecoveryMode, String> 
         2 => Ok(DBRecoveryMode::PointInTime),
         3 => Ok(DBRecoveryMode::SkipAnyCorruptedRecords),
         _ => Err(format!("not valid recovery mode: {}", mode)),
+    }
+}
+
+fn parse_rocksdb_compaction_priority(priority: i64) -> Result<CompactionPriority, String> {
+    match priority {
+        0 => Ok(CompactionPriority::ByCompensatedSize),
+        1 => Ok(CompactionPriority::OldestLargestSeqFirst),
+        2 => Ok(CompactionPriority::OldestSmallestSeqFirst),
+        3 => Ok(CompactionPriority::MinOverlappingRatio),
+        _ => Err(format!("not valid compaction priority: {}", priority)),
     }
 }
 
@@ -173,6 +184,7 @@ struct CfOptValues {
     pub level_zero_file_num_compaction_trigger: i64,
     pub level_zero_slowdown_writes_trigger: i64,
     pub level_zero_stop_writes_trigger: i64,
+    pub compaction_priority: i64,
 }
 
 // TODO: verify: (TiDB default values) == (rocksdb default values)
@@ -195,6 +207,7 @@ impl Default for CfOptValues {
             level_zero_file_num_compaction_trigger: 4,
             level_zero_slowdown_writes_trigger: 20,
             level_zero_stop_writes_trigger: 36,
+            compaction_priority: 0,
         }
     }
 }
@@ -288,6 +301,13 @@ fn get_rocksdb_cf_option(config: &toml::Value,
                      (prefix.clone() + "level0-stop-writes-trigger").as_str(),
                      Some(default_values.level_zero_stop_writes_trigger));
     opts.set_level_zero_stop_writes_trigger(level_zero_stop_writes_trigger as i32);
+
+    let compaction_priority = get_toml_int(config,
+                                        (prefix.clone() + "compaction-priority").as_str(),
+                                        Some(default_values.compaction_priority));
+    let compaction_priority = parse_rocksdb_compaction_priority(compaction_priority)
+        .unwrap_or_else(|err| exit_with_err(format!("{:?}", err)));
+    opts.compaction_priority(compaction_priority);
 
     opts
 }

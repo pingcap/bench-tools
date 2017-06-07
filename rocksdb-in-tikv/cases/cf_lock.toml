@@ -36,3 +36,4 @@ max-bytes-for-level-base = "128MB"
 level0-file-num-compaction-trigger = 1
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
+# compaction-style = 0

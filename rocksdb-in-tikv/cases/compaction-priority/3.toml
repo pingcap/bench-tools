@@ -20,7 +20,7 @@
 # max-sub-compactions = 1
 # writable-file-max-buffer-size = "1MB"
 # use-direct-io-for-flush-and-compaction = false
- 
+
 [rocksdb.cf]
 # block-size = "64KB"
 # block-cache-size = "256MB"
@@ -36,3 +36,4 @@
 # level0-file-num-compaction-trigger = 4
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
+compaction-priority = 3

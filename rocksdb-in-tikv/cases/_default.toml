@@ -36,3 +36,4 @@
 # level0-file-num-compaction-trigger = 4
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
+# compaction-style = 0
