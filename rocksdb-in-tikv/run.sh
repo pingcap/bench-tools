@@ -19,8 +19,8 @@ fi
 log=$db_pfx.log
 
 logt() {
-	date=$(date +'%H:%M:%S')
 	while read line; do
+		date=$(date +'%H:%M:%S')
 		echo "[$date] $line"
 	done
 }

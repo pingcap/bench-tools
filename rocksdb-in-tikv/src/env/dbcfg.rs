@@ -319,7 +319,8 @@ pub fn get_db_config(base: &str) -> Result<(RocksdbOptions, RocksdbOptions), Str
     let base_cfg =
         toml::Value::Table(toml::Parser::new(&s).parse().expect("malformed config file"));
 
-    let default_values = CfOptValues::default();
+    let mut default_values = CfOptValues::default();
+    default_values.use_bloom_filter = true;
     let opt_db = get_rocksdb_db_option(&base_cfg);
     let opt_cf = get_rocksdb_cf_option(&base_cfg, "rocksdb.cf", default_values);
     Ok((opt_db, opt_cf))
