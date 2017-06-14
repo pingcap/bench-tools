@@ -1,0 +1,5 @@
+TableID = 121
+Count = 1
+ValLen = [80, 100]
+IdxCnt = 2
+IdxValLen = [[32, 45], [37, 54]]
