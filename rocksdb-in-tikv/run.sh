@@ -40,19 +40,17 @@ cat $plan | grep -v '^#' | while read line; do
 	config=$(echo "$line" | awk '{print $1}')
 	warmup_cnt=$(echo "$line" | awk '{print $2'})
 	bench_cnt=$(echo "$line" | awk '{print $3}')
-	key_len=$(echo $line | awk '{print $4}')
-	val_len=$(echo $line | awk '{print $5}')
-	batch_size=$(echo $line | awk '{print $6}')
-	key_gen=$(echo $line | awk '{print $7}')
-	sub_cmd=$(echo $line | awk '{ for(i=8; i<=NF; i++) printf $i" "; }')
+	batch_size=$(echo $line | awk '{print $4}')
+	region_num=$(echo $line | awk '{print $5}')
+	sub_cmd=$(echo $line | awk '{ for(i=6; i<=NF; i++) printf $i" "; }')
 
 	echo "start: $config" | logt | logi $ts | tee -a $log
 	cat $config | logi $config | logt | logi $ts >> $log
-	
-	$bin -N -d $db -c $config -n $warmup_cnt -K $key_len -V $val_len -B $batch_size -k $key_gen $sub_cmd | logi "warmup: " | logt | logi $ts | tee -a $log
+
+	$bin -N -d $db -c $config -n $warmup_cnt -B $batch_size -R $region_num $sub_cmd | logi "warmup: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
 
-	$bin -N -d $db -c $config -n $bench_cnt -K $key_len -V $val_len -B $batch_size -k $key_gen $sub_cmd | logi "result: " | logt | logi $ts | tee -a $log
+	$bin -N -d $db -c $config -n $bench_cnt -B $batch_size -R $region_num $sub_cmd | logi "result: " | logt | logi $ts | tee -a $log
 	[[ $? == 0 ]] || fatal "run failed"
 done
 

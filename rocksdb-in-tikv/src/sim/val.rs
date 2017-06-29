@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{Rng, thread_rng};
+use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
 
 pub trait ValGen {
     fn next(&mut self) -> Option<&[u8]>;
@@ -35,13 +35,43 @@ impl ValGen for ConstValGen {
     }
 }
 
+pub struct RandValGen {
+    val: Vec<u8>,
+    rand: XorShiftRng,
+}
+
+impl RandValGen {
+    pub fn new(len: usize) -> RandValGen {
+        RandValGen {
+            val: vec![0; len],
+            rand: XorShiftRng::from_seed([1; 4]),
+        }
+    }
+}
+
+impl ValGen for RandValGen {
+    fn next(&mut self) -> Option<&[u8]> {
+        self.rand.fill_bytes(&mut self.val);
+        Some(&self.val)
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::{ValGen, ConstValGen};
+    use super::{ValGen, ConstValGen, RandValGen};
 
     #[test]
     fn test_const_valgen() {
         let mut vg = ConstValGen::new(8);
+        for _ in 0..8 {
+            let val = vg.next().expect("");
+            println!("{:?}", val);
+        }
+    }
+
+    #[test]
+    fn test_rand_valgen() {
+        let mut vg = RandValGen::new(8);
         for _ in 0..8 {
             let val = vg.next().expect("");
             println!("{:?}", val);

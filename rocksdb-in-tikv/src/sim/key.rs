@@ -10,8 +10,10 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // See the License for the specific language governing permissions and
 // limitations under the License.
+extern crate byteorder;
 
 use rand::{Rng, SeedableRng, XorShiftRng, thread_rng};
+use self::byteorder::{BigEndian, WriteBytesExt};
 
 pub trait KeyGen {
     fn next(&mut self) -> Option<&[u8]>;
@@ -108,9 +110,49 @@ impl KeyGen for RandomKeyGen {
     }
 }
 
+pub struct RaftLogKeyGen {
+    key: Vec<u8>,
+    cnt: usize,
+    total: usize,
+    region_num: usize,
+}
+
+impl RaftLogKeyGen {
+    pub fn new(len: usize, cnt: usize, region_num: usize) -> RaftLogKeyGen {
+        RaftLogKeyGen {
+            key: vec![0; len],
+            cnt: cnt,
+            total: cnt,
+            region_num: region_num,
+        }
+    }
+
+    fn key_raft(&mut self, region_id: usize, log_id: usize) {
+        let mut key = Vec::with_capacity(self.key.len());
+        key.write_u64::<BigEndian>(region_id as u64).unwrap();
+        key.push(b':');
+        key.write_u64::<BigEndian>(log_id as u64).unwrap();
+        self.key = key
+    }
+}
+
+impl KeyGen for RaftLogKeyGen {
+    fn next(&mut self) -> Option<&[u8]> {
+        if self.cnt > 0 {
+            let region_id = (self.total - self.cnt) as usize % self.region_num;
+            let log_id = (self.total - self.cnt) as usize / self.region_num;
+            self.key_raft(region_id, log_id);
+            self.cnt -= 1;
+            Some(&self.key)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen};
+    use super::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen, RaftLogKeyGen};
 
     #[test]
     fn test_repeate_keygen() {
@@ -131,6 +173,14 @@ mod test {
     #[test]
     fn test_random_keygen() {
         let mut kg = RandomKeyGen::new(8, 8);
+        while let Some(key) = kg.next() {
+            println!("{:?}", key);
+        }
+    }
+
+    #[test]
+    fn test_raft_keygen() {
+        let mut kg = RaftLogKeyGen::new(17, 20, 10);
         while let Some(key) = kg.next() {
             println!("{:?}", key);
         }

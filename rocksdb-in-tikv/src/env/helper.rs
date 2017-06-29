@@ -77,21 +77,16 @@ pub fn parse_readable_int(size: &str) -> Result<i64, String> {
 pub fn get_toml_boolean(config: &toml::Value, name: &str, default: Option<bool>) -> bool {
     let b = match config.lookup(name) {
         Some(&toml::Value::Boolean(b)) => b,
-        None => {
-            default.unwrap_or_else(|| exit_with_err(format!("please specify {}", name)))
-        }
+        None => default.unwrap_or_else(|| exit_with_err(format!("please specify {}", name))),
         _ => exit_with_err(format!("{} boolean is excepted", name)),
     };
-
     b
 }
 
 pub fn get_toml_string(config: &toml::Value, name: &str, default: Option<String>) -> String {
     let s = match config.lookup(name) {
         Some(&toml::Value::String(ref s)) => s.clone(),
-        None => {
-            default.unwrap_or_else(|| exit_with_err(format!("please specify {}", name)))
-        }
+        None => default.unwrap_or_else(|| exit_with_err(format!("please specify {}", name))),
         _ => exit_with_err(format!("{} string is excepted", name)),
     };
     s

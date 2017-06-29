@@ -39,7 +39,8 @@ pub fn check_max_open_fds(expect: u64) -> Result<(), String> {
             return Ok(());
         }
         Err(format!("open files' limit is too small, got {}, expect >= {}",
-            prev_limit, expect))
+                    prev_limit,
+                    expect))
     }
 }
 
@@ -56,16 +57,22 @@ mod check_kernel {
     type Checker = Fn(i64, i64) -> bool;
 
     fn check_kernel_params(param_path: &str,
-        expect: i64, checker: Box<Checker>) -> Result<(), String> {
+                           expect: i64,
+                           checker: Box<Checker>)
+                           -> Result<(), String> {
 
         let mut buffer = String::new();
         if let Err(e) = fs::File::open(param_path).and_then(|mut f| f.read_to_string(&mut buffer)) {
-            return Err(format!("open path failed while checking kernel params: {}, {}", param_path, e));
+            return Err(format!("open path failed while checking kernel params: {}, {}",
+                               param_path,
+                               e));
         }
 
         let got = buffer.trim_matches('\n').parse::<i64>();
         if let Err(e) = got {
-            return Err(format!("pasrse params failed while checking kernel params: {}, {}", param_path, e));
+            return Err(format!("pasrse params failed while checking kernel params: {}, {}",
+                               param_path,
+                               e));
         }
         let got = got.unwrap();
 
