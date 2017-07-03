@@ -1,10 +1,17 @@
-## key-gen: random, repeat, increase, raft
-## value-gen: random, const
+[bench.config]
+warmup-count = 50000
+bench-count = 100000 
+batch-size = 16
+region-num = 100
+## cf(d: default, l: lock, r: raft, w: write)
+operations = "wrld"
 
 [lockcf.data]
 key-len = 32
 value-len = 128
+## key-gen: random, repeat, increase, raft
 key-gen = "random"
+## value-gen: random, const
 value-gen = "random"
 
 [defaultcf.data]
@@ -63,6 +70,7 @@ compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 # target-file-size-base = "32MB"
 # block-cache-size = "1GB"
 # cache-index-and-filter-blocks = true
+# memtable-prefix-bloom-size-ratio = 0.1
 
 [rocksdb.lockcf]
 block-size = "16KB"
@@ -80,6 +88,7 @@ level0-file-num-compaction-trigger = 1
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
 # compaction-style = 0
+# memtable-prefix-bloom-size-ratio = 0.1
 
 [rocksdb.writecf]
 compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
@@ -96,6 +105,7 @@ compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
 # cache-index-and-filter-blocks = true
+# memtable-prefix-bloom-size-ratio = 0.1
  
 [rocksdb.raftcf]
 compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
@@ -111,3 +121,4 @@ compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
 # cache-index-and-filter-blocks = true
+# memtable-prefix-bloom-size-ratio = 0.1

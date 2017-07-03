@@ -26,24 +26,24 @@ use std::sync::Arc;
 use std::path::Path;
 use std::fs::File;
 use std::io::Read;
+use std::str;
 
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 use rocksdb::DB;
 
 mod sim;
 mod env;
-use env::cfscfg;
+use env::utils;
 use sim::key::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen, RaftLogKeyGen};
 use sim::val::{ValGen, ConstValGen, RandValGen};
-use sim::cf::{cf_d_write, cf_l_write, cf_r_write, cf_w_write, cf_dl_write, cf_dr_write,
-              cf_dw_write, cf_lr_write, cf_lw_write, cf_rw_write, cf_dlr_write, cf_dlw_write,
-              cf_drw_write, cf_lrw_write, cf_dlrw_write};
+use sim::cf::{cfs_write, ColumnFamilies};
 use env::{CF_WRITE, CF_RAFT, CF_LOCK, CF_DEFAULT};
 use env::helper::{get_toml_string, get_toml_int};
 
-const DEFAULT_COUNT: usize = 10000;
-const DEFAULT_BATCH_SIZE: usize = 128;
-const DEFAULT_REGION_NUM: usize = 100;
+const DEFAULT_WARMUP_COUNT: i64 = 200000;
+const DEFAULT_BENCH_COUNT: i64 = 200000;
+const DEFAULT_BATCH_SIZE: i64 = 128;
+const DEFAULT_REGION_NUM: i64 = 100;
 
 const ROCKSDB_DB_STATS_KEY: &'static str = "rocksdb.dbstats";
 const ROCKSDB_CF_STATS_KEY: &'static str = "rocksdb.cfstats";
@@ -52,11 +52,6 @@ fn run() -> Result<usize, String> {
     let app = App::new("Rocksdb in TiKV")
         .author("PingCAP")
         .about("Benchmark of rocksdb in the sim-tikv-env")
-        .arg(Arg::with_name("skip_sys_check")
-            .short("N")
-            .takes_value(false)
-            .help("skip system check")
-            .required(false))
         .arg(Arg::with_name("db_path")
             .short("d")
             .long("db")
@@ -68,50 +63,9 @@ fn run() -> Result<usize, String> {
             .long("config")
             .takes_value(true)
             .help("toml config file")
-            .required(true))
-        .arg(Arg::with_name("count")
-            .short("n")
-            .long("count")
-            .takes_value(true)
-            .help("request count")
-            .required(true))
-        .arg(Arg::with_name("batch_size")
-            .short("B")
-            .long("batch_size")
-            .takes_value(true)
-            .help("set batch size")
-            .required(false))
-        .arg(Arg::with_name("region_num")
-            .short("R")
-            .long("region_num")
-            .takes_value(true)
-            .help("set region number")
-            .required(false))
-        .subcommand(SubCommand::with_name("cf")
-            .subcommand(SubCommand::with_name("d"))
-            .subcommand(SubCommand::with_name("l"))
-            .subcommand(SubCommand::with_name("r"))
-            .subcommand(SubCommand::with_name("w"))
-            .subcommand(SubCommand::with_name("dl"))
-            .subcommand(SubCommand::with_name("dr"))
-            .subcommand(SubCommand::with_name("dw"))
-            .subcommand(SubCommand::with_name("lr"))
-            .subcommand(SubCommand::with_name("lw"))
-            .subcommand(SubCommand::with_name("rw"))
-            .subcommand(SubCommand::with_name("dlr"))
-            .subcommand(SubCommand::with_name("dlw"))
-            .subcommand(SubCommand::with_name("drw"))
-            .subcommand(SubCommand::with_name("lrw"))
-            .subcommand(SubCommand::with_name("dlrw")))
-        .subcommand(SubCommand::with_name("txn"));
+            .required(true));
 
     let matches = app.clone().get_matches();
-
-    if !matches.is_present("skip_sys_check") {
-        if let Err(e) = env::check::check_system_config() {
-            return Err(format!("system config not satisfied: {}\n", e));
-        }
-    }
 
     let db_path = Path::new(matches.value_of("db_path").unwrap());
     let config = match matches.value_of("config") {
@@ -127,262 +81,159 @@ fn run() -> Result<usize, String> {
         None => toml::Value::Integer(0),
     };
 
-    let db_opts = cfscfg::get_rocksdb_db_option(&config);
+    let db_opts = utils::get_rocksdb_db_option(&config);
     let cfs_opts =
-        vec![cfscfg::CFOptions::new(CF_DEFAULT, cfscfg::get_rocksdb_default_cf_option(&config)),
-             cfscfg::CFOptions::new(CF_LOCK, cfscfg::get_rocksdb_lock_cf_option(&config)),
-             cfscfg::CFOptions::new(CF_WRITE, cfscfg::get_rocksdb_write_cf_option(&config)),
-             cfscfg::CFOptions::new(CF_RAFT, cfscfg::get_rocksdb_raftlog_cf_option(&config))];
+        vec![utils::CFOptions::new(CF_DEFAULT, utils::get_rocksdb_default_cf_option(&config)),
+             utils::CFOptions::new(CF_LOCK, utils::get_rocksdb_lock_cf_option(&config)),
+             utils::CFOptions::new(CF_WRITE, utils::get_rocksdb_write_cf_option(&config)),
+             utils::CFOptions::new(CF_RAFT, utils::get_rocksdb_raftlog_cf_option(&config))];
     let db_path = db_path.clone();
-    let db = Arc::new(cfscfg::new_engine_opt(db_path.to_str()
-                                                 .unwrap(),
-                                             db_opts,
-                                             cfs_opts)
-        .unwrap_or_else(|err| cfscfg::exit_with_err(format!("{:?}", err))));
+    let db = Arc::new(utils::new_engine_opt(db_path.to_str()
+                                                .unwrap(),
+                                            db_opts,
+                                            cfs_opts)
+        .unwrap_or_else(|err| utils::exit_with_err(format!("{:?}", err))));
 
-    let count = match matches.value_of("count") {
-        Some(v) => {
-            match v.parse() {
-                Ok(v) => v,
-                Err(count) => return Err(format!("{} is not a number", count)),
-            }
-        }
-        None => DEFAULT_COUNT,
-    };
 
-    let batch_size = match matches.value_of("batch_size") {
-        Some(v) => {
-            match v.parse() {
-                Ok(v) => v,
-                Err(batch_size) => return Err(format!("{} is not a number", batch_size)),
-            }
-        }
-        None => DEFAULT_BATCH_SIZE,
-    };
 
-    let region_num = match matches.value_of("region_num") {
-        Some(v) => {
-            match v.parse() {
-                Ok(v) => v,
-                Err(region_num) => return Err(format!("{} is not a number", region_num)),
-            }
-        }
-        None => DEFAULT_REGION_NUM,
-    };
+    let warmup_cnt = get_toml_int(&config,
+                                  ("bench.config.warmup-count").chars().as_str(),
+                                  Some(DEFAULT_WARMUP_COUNT)) as usize;
+    let bench_cnt = get_toml_int(&config,
+                                 ("bench.config.bench-count").chars().as_str(),
+                                 Some(DEFAULT_BENCH_COUNT)) as usize;
+    let batch_size = get_toml_int(&config,
+                                  ("bench.config.batch-size").chars().as_str(),
+                                  Some(DEFAULT_BATCH_SIZE)) as usize;
+    let region_num = get_toml_int(&config,
+                                  ("bench.config.region-num").chars().as_str(),
+                                  Some(DEFAULT_REGION_NUM)) as usize;
+    let operations = get_toml_string(&config,
+                                     ("bench.config.operations").chars().as_str(),
+                                     Some(String::from("d")));
 
-    let keygen_d = get_toml_string(&config,
-                                   ("defaultcf.data.key-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let keygen_l = get_toml_string(&config,
-                                   ("lockcf.data.key-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let keygen_r = get_toml_string(&config,
-                                   ("raftcf.data.key-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let keygen_w = get_toml_string(&config,
-                                   ("writecf.data.key-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let valgen_d = get_toml_string(&config,
-                                   ("defaultcf.data.value-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let valgen_l = get_toml_string(&config,
-                                   ("lockcf.data.value-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let valgen_r = get_toml_string(&config,
-                                   ("raftcf.data.value-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let valgen_w = get_toml_string(&config,
-                                   ("writecf.data.value-gen").chars().as_str(),
-                                   Some(String::from("random")));
-    let keylen_d = get_toml_int(&config,
-                                ("defaultcf.data.key-len").chars().as_str(),
-                                Some(32));
-    let keylen_l = get_toml_int(&config, ("lockcf.data.key-len").chars().as_str(), Some(32));
-    let keylen_r = get_toml_int(&config, ("raftcf.data.key-len").chars().as_str(), Some(32));
-    let keylen_w = get_toml_int(&config, ("writecf.data.key-len").chars().as_str(), Some(32));
-    let valuelen_d = get_toml_int(&config,
-                                  ("defaultcf.data.value-len").chars().as_str(),
-                                  Some(128));
-    let valuelen_l = get_toml_int(&config,
-                                  ("lockcf.data.value-len").chars().as_str(),
-                                  Some(128));
-    let valuelen_r = get_toml_int(&config,
-                                  ("raftcf.data.value-len").chars().as_str(),
-                                  Some(128));
-    let valuelen_w = get_toml_int(&config,
+    let kgen_default = get_toml_string(&config,
+                                       ("defaultcf.data.key-gen").chars().as_str(),
+                                       Some(String::from("random")));
+    let kgen_lock = get_toml_string(&config,
+                                    ("lockcf.data.key-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let kgen_raft = get_toml_string(&config,
+                                    ("raftcf.data.key-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let kgen_write = get_toml_string(&config,
+                                     ("writecf.data.key-gen").chars().as_str(),
+                                     Some(String::from("random")));
+    let vgen_default = get_toml_string(&config,
+                                       ("defaultcf.data.value-gen").chars().as_str(),
+                                       Some(String::from("random")));
+    let vgen_lock = get_toml_string(&config,
+                                    ("lockcf.data.value-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let vgen_raft = get_toml_string(&config,
+                                    ("raftcf.data.value-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let vgen_write = get_toml_string(&config,
+                                     ("writecf.data.value-gen").chars().as_str(),
+                                     Some(String::from("random")));
+    let klen_default = get_toml_int(&config,
+                                    ("defaultcf.data.key-len").chars().as_str(),
+                                    Some(32)) as usize;
+    let klen_lock =
+        get_toml_int(&config, ("lockcf.data.key-len").chars().as_str(), Some(32)) as usize;
+    let klen_raft =
+        get_toml_int(&config, ("raftcf.data.key-len").chars().as_str(), Some(32)) as usize;
+    let klen_write =
+        get_toml_int(&config, ("writecf.data.key-len").chars().as_str(), Some(32)) as usize;
+    let vlen_default = get_toml_int(&config,
+                                    ("defaultcf.data.value-len").chars().as_str(),
+                                    Some(128)) as usize;
+    let vlen_lock = get_toml_int(&config,
+                                 ("lockcf.data.value-len").chars().as_str(),
+                                 Some(128)) as usize;
+    let vlen_raft = get_toml_int(&config,
+                                 ("raftcf.data.value-len").chars().as_str(),
+                                 Some(128)) as usize;
+    let vlen_write = get_toml_int(&config,
                                   ("writecf.data.value-len").chars().as_str(),
-                                  Some(128));
+                                  Some(128)) as usize;
 
-    let mut keys_d: Box<KeyGen> = key_type(&keygen_d, keylen_d as usize, count, region_num);
-    let mut keys_l: Box<KeyGen> = key_type(&keygen_l, keylen_l as usize, count, region_num);
-    let mut keys_r: Box<KeyGen> = key_type(&keygen_r, keylen_r as usize, count, region_num);
-    let mut keys_w: Box<KeyGen> = key_type(&keygen_w, keylen_w as usize, count, region_num);
-    let mut vals_d: Box<ValGen> = value_type(&valgen_d, valuelen_d as usize);
-    let mut vals_l: Box<ValGen> = value_type(&valgen_l, valuelen_l as usize);
-    let mut vals_r: Box<ValGen> = value_type(&valgen_r, valuelen_r as usize);
-    let mut vals_w: Box<ValGen> = value_type(&valgen_w, valuelen_w as usize);
+    let mut warmup_k_d: Box<KeyGen> = key_type(&kgen_default, klen_default, warmup_cnt, region_num);
+    let mut warmup_k_l: Box<KeyGen> = key_type(&kgen_lock, klen_lock, warmup_cnt, region_num);
+    let mut warmup_k_r: Box<KeyGen> = key_type(&kgen_raft, klen_raft, warmup_cnt, region_num);
+    let mut warmup_k_w: Box<KeyGen> = key_type(&kgen_write, klen_write, warmup_cnt, region_num);
+
+    let mut bench_k_d: Box<KeyGen> = key_type(&kgen_default, klen_default, bench_cnt, region_num);
+    let mut bench_k_l: Box<KeyGen> = key_type(&kgen_lock, klen_lock, bench_cnt, region_num);
+    let mut bench_k_r: Box<KeyGen> = key_type(&kgen_raft, klen_raft, bench_cnt, region_num);
+    let mut bench_k_w: Box<KeyGen> = key_type(&kgen_write, klen_write, bench_cnt, region_num);
+
+    let mut v_d: Box<ValGen> = value_type(&vgen_default, vlen_default);
+    let mut v_l: Box<ValGen> = value_type(&vgen_lock, vlen_lock);
+    let mut v_r: Box<ValGen> = value_type(&vgen_raft, vlen_raft);
+    let mut v_w: Box<ValGen> = value_type(&vgen_write, vlen_write);
 
     let default_cf = db.cf_handle(CF_DEFAULT).unwrap();
     let lock_cf = db.cf_handle(CF_LOCK).unwrap();
     let write_cf = db.cf_handle(CF_WRITE).unwrap();
     let raft_cf = db.cf_handle(CF_RAFT).unwrap();
 
-    let res = match matches.subcommand() {
-        ("cf", Some(cf)) => {
-            match cf.subcommand_name().unwrap() {
-                "d" => cf_d_write(&db, &mut *keys_d, &mut *vals_d, batch_size, default_cf),
-                "l" => cf_l_write(&db, &mut *keys_l, &mut *vals_l, batch_size, lock_cf),
-                "w" => cf_w_write(&db, &mut *keys_w, &mut *vals_w, batch_size, write_cf),
-                "r" => cf_r_write(&db, &mut *keys_r, &mut *vals_r, batch_size, raft_cf),
-                "dl" => {
-                    cf_dl_write(&db,
-                                &mut *keys_d,
-                                &mut *vals_d,
-                                &mut *keys_l,
-                                &mut *vals_l,
-                                batch_size,
-                                default_cf,
-                                lock_cf)
-                }
-                "dr" => {
-                    cf_dr_write(&db,
-                                &mut *keys_d,
-                                &mut *vals_d,
-                                &mut *keys_r,
-                                &mut *vals_r,
-                                batch_size,
-                                default_cf,
-                                raft_cf)
-                }
-                "dw" => {
-                    cf_dw_write(&db,
-                                &mut *keys_d,
-                                &mut *vals_d,
-                                &mut *keys_w,
-                                &mut *vals_w,
-                                batch_size,
-                                default_cf,
-                                write_cf)
-                }
-                "lr" => {
-                    cf_lr_write(&db,
-                                &mut *keys_l,
-                                &mut *vals_l,
-                                &mut *keys_r,
-                                &mut *vals_r,
-                                batch_size,
-                                lock_cf,
-                                raft_cf)
-                }
-                "lw" => {
-                    cf_lw_write(&db,
-                                &mut *keys_l,
-                                &mut *vals_l,
-                                &mut *keys_w,
-                                &mut *vals_w,
-                                batch_size,
-                                lock_cf,
-                                write_cf)
-                }
-                "rw" => {
-                    cf_rw_write(&db,
-                                &mut *keys_r,
-                                &mut *vals_r,
-                                &mut *keys_w,
-                                &mut *vals_w,
-                                batch_size,
-                                raft_cf,
-                                write_cf)
-                }
-                "dlr" => {
-                    cf_dlr_write(&db,
-                                 &mut *keys_d,
-                                 &mut *vals_d,
-                                 &mut *keys_l,
-                                 &mut *vals_l,
-                                 &mut *keys_r,
-                                 &mut *vals_r,
-                                 batch_size,
-                                 default_cf,
-                                 lock_cf,
-                                 raft_cf)
-                }
-                "dlw" => {
-                    cf_dlw_write(&db,
-                                 &mut *keys_d,
-                                 &mut *vals_d,
-                                 &mut *keys_l,
-                                 &mut *vals_l,
-                                 &mut *keys_w,
-                                 &mut *vals_w,
-                                 batch_size,
-                                 default_cf,
-                                 lock_cf,
-                                 write_cf)
-                }
-                "drw" => {
-                    cf_drw_write(&db,
-                                 &mut *keys_d,
-                                 &mut *vals_d,
-                                 &mut *keys_r,
-                                 &mut *vals_r,
-                                 &mut *keys_w,
-                                 &mut *vals_w,
-                                 batch_size,
-                                 default_cf,
-                                 raft_cf,
-                                 write_cf)
-                }
-                "lrw" => {
-                    cf_lrw_write(&db,
-                                 &mut *keys_l,
-                                 &mut *vals_l,
-                                 &mut *keys_r,
-                                 &mut *vals_r,
-                                 &mut *keys_w,
-                                 &mut *vals_w,
-                                 batch_size,
-                                 lock_cf,
-                                 raft_cf,
-                                 write_cf)
-                }
-                "dlrw" => {
-                    cf_dlrw_write(&db,
-                                  &mut *keys_d,
-                                  &mut *vals_d,
-                                  &mut *keys_l,
-                                  &mut *vals_l,
-                                  &mut *keys_r,
-                                  &mut *vals_r,
-                                  &mut *keys_w,
-                                  &mut *vals_w,
-                                  batch_size,
-                                  default_cf,
-                                  lock_cf,
-                                  raft_cf,
-                                  write_cf)
-                }
-                _ => help_err(app),
-            }
-        }
-        ("txn", _) => {
-            return Err("txn bench mark not impl".to_owned());
-        }
-        _ => help_err(app),
+    let mut column_families = ColumnFamilies {
+        default: false,
+        lock: false,
+        raft: false,
+        write: false,
     };
+    let command = operations.as_str();
+    if command.contains("d") {
+        column_families.default = true
+    }
+    if command.contains("l") {
+        column_families.lock = true
+    }
+    if command.contains("r") {
+        column_families.raft = true
+    }
+    if command.contains("w") {
+        column_families.write = true
+    }
+    let _ = cfs_write(&db,
+                      &column_families,
+                      &mut *warmup_k_d,
+                      &mut *v_d,
+                      &mut *warmup_k_l,
+                      &mut *v_l,
+                      &mut *warmup_k_r,
+                      &mut *v_r,
+                      &mut *warmup_k_w,
+                      &mut *v_w,
+                      batch_size,
+                      default_cf,
+                      lock_cf,
+                      raft_cf,
+                      write_cf);
+
+    let bench_res = cfs_write(&db,
+                              &column_families,
+                              &mut *bench_k_d,
+                              &mut *v_d,
+                              &mut *bench_k_l,
+                              &mut *v_l,
+                              &mut *bench_k_r,
+                              &mut *v_r,
+                              &mut *bench_k_w,
+                              &mut *v_w,
+                              batch_size,
+                              default_cf,
+                              lock_cf,
+                              raft_cf,
+                              write_cf);
 
     output_stats(&db);
-
-    match res {
-        Ok(_) => Ok(count),
+    match bench_res {
+        Ok(_) => Ok(bench_cnt),
         Err(e) => Err(e),
     }
-}
-
-fn help_err(app: clap::App) -> Result<(), String> {
-    let mut help = Vec::new();
-    app.write_help(&mut help).unwrap();
-    Err(String::from_utf8(help).unwrap())
 }
 
 fn output_stats(db: &DB) {

@@ -8,7 +8,7 @@ use std::process;
 use std::path::Path;
 use std::fs;
 use std::mem;
-use super::helper::{get_toml_boolean, get_toml_int, get_toml_string};
+use super::helper::{get_toml_boolean, get_toml_int, get_toml_string, get_toml_float};
 use env::CF_DEFAULT;
 
 const SEC_TO_MS: i64 = 1000;
@@ -86,6 +86,7 @@ struct CfOptValues {
     pub level_zero_slowdown_writes_trigger: i64,
     pub level_zero_stop_writes_trigger: i64,
     pub compaction_priority: i64,
+    pub memtable_prefix_bloom_size_ratio: f64,
 }
 
 // TODO: verify: (TiDB default values) == (rocksdb default values)
@@ -109,6 +110,7 @@ impl Default for CfOptValues {
             level_zero_slowdown_writes_trigger: 20,
             level_zero_stop_writes_trigger: 36,
             compaction_priority: 0,
+            memtable_prefix_bloom_size_ratio: 0.1,
         }
     }
 }
@@ -451,7 +453,11 @@ fn get_rocksdb_cf_option(config: &toml::Value,
                      (prefix.clone() + "level0-stop-writes-trigger").as_str(),
                      Some(default_values.level_zero_stop_writes_trigger));
     opts.set_level_zero_stop_writes_trigger(level_zero_stop_writes_trigger as i32);
-
+    let memtable_prefix_bloom_size_ratio =
+        get_toml_float(config,
+                       (prefix.clone() + "memtable-prefix-bloom-size-ratio").as_str(),
+                       Some(default_values.memtable_prefix_bloom_size_ratio));
+    opts.set_memtable_prefix_bloom_size_ratio(memtable_prefix_bloom_size_ratio as f64);
     opts
 }
 
@@ -478,7 +484,6 @@ pub fn get_rocksdb_write_cf_option(config: &toml::Value) -> RocksdbOptions {
                               Box::new(FixedSuffixSliceTransform::new(8)))
         .unwrap_or_else(|err| exit_with_err(format!("{:?}", err)));
     // Create prefix bloom filter for memtable.
-    opts.set_memtable_prefix_bloom_size_ratio(0.1 as f64);
     opts
 }
 
@@ -511,7 +516,6 @@ pub fn get_rocksdb_lock_cf_option(config: &toml::Value) -> RocksdbOptions {
     // Currently if we want create bloom filter for memtable, we must set prefix extractor.
     opts.set_prefix_extractor("NoopSliceTransform", Box::new(NoopSliceTransform))
         .unwrap_or_else(|err| exit_with_err(format!("{:?}", err)));
-    opts.set_memtable_prefix_bloom_size_ratio(0.1 as f64);
     opts
 }
 

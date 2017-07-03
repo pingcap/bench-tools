@@ -1,8 +1,2 @@
-#1 config
-#2 warmup_cnt
-#3 bench_cnt
-#4 batch_size
-#5 region_num
-#6 bench_mode
-#7 cf(d: default, l: lock, r: raft, w: write))
-cases/cf_multi.toml 5000000 1000000 16 100 cf dlrw
+# configure file
+cases/cf_multi.toml

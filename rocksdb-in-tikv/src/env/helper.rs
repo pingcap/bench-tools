@@ -111,3 +111,19 @@ pub fn get_toml_int(config: &toml::Value, name: &str, default: Option<i64>) -> i
         i
     })
 }
+
+pub fn get_toml_float_opt(config: &toml::Value, name: &str) -> Option<f64> {
+    let res = match config.lookup(name) {
+        Some(&toml::Value::Float(i)) => Some(i),
+        None => None,
+        _ => exit_with_err(format!("{} int or readable int is excepted", name)),
+    };
+    res
+}
+
+pub fn get_toml_float(config: &toml::Value, name: &str, default: Option<f64>) -> f64 {
+    get_toml_float_opt(config, name).unwrap_or_else(|| {
+        let i = default.unwrap_or_else(|| exit_with_err(format!("please specify {}", name)));
+        i
+    })
+}

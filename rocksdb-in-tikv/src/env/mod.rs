@@ -12,9 +12,7 @@
 // limitations under the License.
 
 pub mod helper;
-pub mod check;
-pub mod kgcfg;
-pub mod cfscfg;
+pub mod utils;
 
 pub type CfName = &'static str;
 pub const CF_DEFAULT: CfName = "default";
