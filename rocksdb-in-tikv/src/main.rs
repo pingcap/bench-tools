@@ -34,8 +34,8 @@ use rocksdb::DB;
 mod sim;
 mod env;
 use env::utils;
-use sim::key::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen, RaftLogKeyGen};
-use sim::val::{ValGen, ConstValGen, RandValGen};
+use sim::key::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen, SeqKeyGen};
+use sim::val::{ValGen, RepeatValGen, RandValGen};
 use sim::cf::{cfs_write, ColumnFamilies};
 use env::{CF_WRITE, CF_RAFT, CF_LOCK, CF_DEFAULT};
 use env::helper::{get_toml_string, get_toml_int};
@@ -108,9 +108,9 @@ fn run() -> Result<usize, String> {
     let region_num = get_toml_int(&config,
                                   ("bench.config.region-num").chars().as_str(),
                                   Some(DEFAULT_REGION_NUM)) as usize;
-    let operations = get_toml_string(&config,
-                                     ("bench.config.operations").chars().as_str(),
-                                     Some(String::from("d")));
+    let operate_cfs = get_toml_string(&config,
+                                      ("bench.config.operate-cfs").chars().as_str(),
+                                      Some(String::from("d")));
 
     let kgen_default = get_toml_string(&config,
                                        ("defaultcf.data.key-gen").chars().as_str(),
@@ -184,7 +184,7 @@ fn run() -> Result<usize, String> {
         raft: false,
         write: false,
     };
-    let command = operations.as_str();
+    let command = operate_cfs.as_str();
     if command.contains("d") {
         column_families.default = true
     }
@@ -253,14 +253,14 @@ fn key_type(key_gen: &str, key_len: usize, count: usize, region_num: usize) -> B
         "repeat" => Box::new(RepeatKeyGen::new(key_len, count)),
         "increase" => Box::new(IncreaseKeyGen::new(key_len, count)),
         "random" => Box::new(RandomKeyGen::new(key_len, count)),
-        "raft" => Box::new(RaftLogKeyGen::new(key_len, count, region_num)),
+        "sequence" => Box::new(SeqKeyGen::new(key_len, count, region_num)),
         _ => unreachable!("key-gen cannot be {:?}", key_gen),
     }
 }
 
 fn value_type(val_gen: &str, val_len: usize) -> Box<ValGen> {
     match val_gen {
-        "const" => Box::new(ConstValGen::new(val_len)),
+        "repeat" => Box::new(RepeatValGen::new(val_len)),
         "random" => Box::new(RandValGen::new(val_len)),
         _ => unreachable!("value-gen cannot be {:?}", val_gen),
     }

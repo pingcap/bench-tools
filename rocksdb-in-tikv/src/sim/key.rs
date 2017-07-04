@@ -110,16 +110,16 @@ impl KeyGen for RandomKeyGen {
     }
 }
 
-pub struct RaftLogKeyGen {
+pub struct SeqKeyGen {
     key: Vec<u8>,
     cnt: usize,
     total: usize,
     region_num: usize,
 }
 
-impl RaftLogKeyGen {
-    pub fn new(len: usize, cnt: usize, region_num: usize) -> RaftLogKeyGen {
-        RaftLogKeyGen {
+impl SeqKeyGen {
+    pub fn new(len: usize, cnt: usize, region_num: usize) -> SeqKeyGen {
+        SeqKeyGen {
             key: vec![0; len],
             cnt: cnt,
             total: cnt,
@@ -136,7 +136,7 @@ impl RaftLogKeyGen {
     }
 }
 
-impl KeyGen for RaftLogKeyGen {
+impl KeyGen for SeqKeyGen {
     fn next(&mut self) -> Option<&[u8]> {
         if self.cnt > 0 {
             let region_id = (self.total - self.cnt) as usize % self.region_num;
@@ -152,7 +152,7 @@ impl KeyGen for RaftLogKeyGen {
 
 #[cfg(test)]
 mod test {
-    use super::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen, RaftLogKeyGen};
+    use super::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen, SeqKeyGen};
 
     #[test]
     fn test_repeate_keygen() {
@@ -180,7 +180,7 @@ mod test {
 
     #[test]
     fn test_raft_keygen() {
-        let mut kg = RaftLogKeyGen::new(17, 20, 10);
+        let mut kg = SeqKeyGen::new(17, 20, 10);
         while let Some(key) = kg.next() {
             println!("{:?}", key);
         }

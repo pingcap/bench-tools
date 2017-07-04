@@ -17,19 +17,19 @@ pub trait ValGen {
     fn next(&mut self) -> Option<&[u8]>;
 }
 
-pub struct ConstValGen {
+pub struct RepeatValGen {
     val: Vec<u8>,
 }
 
-impl ConstValGen {
-    pub fn new(len: usize) -> ConstValGen {
-        let mut vals = ConstValGen { val: vec![0; len] };
+impl RepeatValGen {
+    pub fn new(len: usize) -> RepeatValGen {
+        let mut vals = RepeatValGen { val: vec![0; len] };
         thread_rng().fill_bytes(&mut vals.val);
         vals
     }
 }
 
-impl ValGen for ConstValGen {
+impl ValGen for RepeatValGen {
     fn next(&mut self) -> Option<&[u8]> {
         Some(&self.val)
     }
@@ -58,11 +58,11 @@ impl ValGen for RandValGen {
 
 #[cfg(test)]
 mod test {
-    use super::{ValGen, ConstValGen, RandValGen};
+    use super::{ValGen, RepeatValGen, RandValGen};
 
     #[test]
     fn test_const_valgen() {
-        let mut vg = ConstValGen::new(8);
+        let mut vg = RepeatValGen::new(8);
         for _ in 0..8 {
             let val = vg.next().expect("");
             println!("{:?}", val);

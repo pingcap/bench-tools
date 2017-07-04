@@ -8,7 +8,7 @@ use std::process;
 use std::path::Path;
 use std::fs;
 use std::mem;
-use super::helper::{get_toml_boolean, get_toml_int, get_toml_string, get_toml_float};
+use super::helper::{get_toml_boolean, get_toml_int, get_toml_string};
 use env::CF_DEFAULT;
 
 const SEC_TO_MS: i64 = 1000;
@@ -17,8 +17,8 @@ const DATA_MAGNITUDE: u64 = 1024;
 const KB: u64 = UNIT * DATA_MAGNITUDE;
 const MB: u64 = KB * DATA_MAGNITUDE;
 const GB: u64 = MB * DATA_MAGNITUDE;
-const RAFTCF_MIN_MEM: u64 = 256 * MB;
-const RAFTCF_MAX_MEM: u64 = 2 * GB;
+const RAFTLOGCF_MIN_MEM: u64 = 256 * MB;
+const RAFTLOGCF_MAX_MEM: u64 = 2 * GB;
 const LOCKCF_MIN_MEM: u64 = 256 * MB;
 const LOCKCF_MAX_MEM: u64 = GB;
 
@@ -86,7 +86,6 @@ struct CfOptValues {
     pub level_zero_slowdown_writes_trigger: i64,
     pub level_zero_stop_writes_trigger: i64,
     pub compaction_priority: i64,
-    pub memtable_prefix_bloom_size_ratio: f64,
 }
 
 // TODO: verify: (TiDB default values) == (rocksdb default values)
@@ -110,7 +109,6 @@ impl Default for CfOptValues {
             level_zero_slowdown_writes_trigger: 20,
             level_zero_stop_writes_trigger: 36,
             compaction_priority: 0,
-            memtable_prefix_bloom_size_ratio: 0.1,
         }
     }
 }
@@ -453,18 +451,14 @@ fn get_rocksdb_cf_option(config: &toml::Value,
                      (prefix.clone() + "level0-stop-writes-trigger").as_str(),
                      Some(default_values.level_zero_stop_writes_trigger));
     opts.set_level_zero_stop_writes_trigger(level_zero_stop_writes_trigger as i32);
-    let memtable_prefix_bloom_size_ratio =
-        get_toml_float(config,
-                       (prefix.clone() + "memtable-prefix-bloom-size-ratio").as_str(),
-                       Some(default_values.memtable_prefix_bloom_size_ratio));
-    opts.set_memtable_prefix_bloom_size_ratio(memtable_prefix_bloom_size_ratio as f64);
     opts
 }
 
 pub fn get_rocksdb_default_cf_option(config: &toml::Value) -> RocksdbOptions {
     let mut default_values = CfOptValues::default();
-    // default_values.block_cache_size =
-    //     align_to_mb((total_mem as f64 * DEFAULT_BLOCK_CACHE_RATIO[0]) as u64) as i64;
+    default_values.block_cache_size = get_toml_int(config,
+                                                   "rocksdb.defaultcf.block-cache-size",
+                                                   Some(134217728));
     default_values.use_bloom_filter = true;
     default_values.whole_key_filtering = true;
 
@@ -473,8 +467,8 @@ pub fn get_rocksdb_default_cf_option(config: &toml::Value) -> RocksdbOptions {
 
 pub fn get_rocksdb_write_cf_option(config: &toml::Value) -> RocksdbOptions {
     let mut default_values = CfOptValues::default();
-    // default_values.block_cache_size =
-    // align_to_mb((total_mem as f64 * DEFAULT_BLOCK_CACHE_RATIO[1]) as u64) as i64;
+    default_values.block_cache_size =
+        get_toml_int(config, "rocksdb.writecf.block-cache-size", Some(134217728));
     default_values.use_bloom_filter = true;
     default_values.whole_key_filtering = false;
 
@@ -484,16 +478,22 @@ pub fn get_rocksdb_write_cf_option(config: &toml::Value) -> RocksdbOptions {
                               Box::new(FixedSuffixSliceTransform::new(8)))
         .unwrap_or_else(|err| exit_with_err(format!("{:?}", err)));
     // Create prefix bloom filter for memtable.
+    let memtable_prefix_bloom =
+        get_toml_boolean(config, "rocksdb.writecf.memtable-prefix-bloom", Some(true));
+    if memtable_prefix_bloom {
+        opts.set_memtable_prefix_bloom_size_ratio(0.1 as f64);
+    }
     opts
 }
 
 pub fn get_rocksdb_raftlog_cf_option(config: &toml::Value) -> RocksdbOptions {
-    // let cache_size = align_to_mb((total_mem as f64 * DEFAULT_BLOCK_CACHE_RATIO[2]) as u64);
-    let block_cache_size = adjust_block_cache_size(134217728, RAFTCF_MIN_MEM, RAFTCF_MAX_MEM);
+    let cache_size = get_toml_int(config, "rocksdb.raftlogcf.cache-size", Some(134217728)) as u64;
+    let block_cache_size =
+        adjust_block_cache_size(cache_size, RAFTLOGCF_MIN_MEM, RAFTLOGCF_MAX_MEM);
     let mut default_values = CfOptValues::default();
     default_values.block_cache_size = block_cache_size as i64;
 
-    let mut opts = get_rocksdb_cf_option(config, "raftcf", default_values);
+    let mut opts = get_rocksdb_cf_option(config, "raftlogcf", default_values);
     opts.set_memtable_insert_hint_prefix_extractor("RaftPrefixSliceTransform",
             Box::new(FixedPrefixSliceTransform::new(region_raft_prefix_len())))
         .unwrap_or_else(|err| exit_with_err(format!("{:?}", err)));
@@ -501,8 +501,8 @@ pub fn get_rocksdb_raftlog_cf_option(config: &toml::Value) -> RocksdbOptions {
 }
 
 pub fn get_rocksdb_lock_cf_option(config: &toml::Value) -> RocksdbOptions {
-    // let cache_size = align_to_mb((total_mem as f64 * DEFAULT_BLOCK_CACHE_RATIO[3]) as u64);
-    let block_cache_size = adjust_block_cache_size(134217728, LOCKCF_MIN_MEM, LOCKCF_MAX_MEM);
+    let cache_size = get_toml_int(config, "rocksdb.lockcf.cache-size", Some(134217728)) as u64;
+    let block_cache_size = adjust_block_cache_size(cache_size, LOCKCF_MIN_MEM, LOCKCF_MAX_MEM);
     let mut default_values = CfOptValues::default();
     default_values.block_cache_size = block_cache_size as i64;
     default_values.block_size = 16 * KB as i64;
@@ -516,6 +516,11 @@ pub fn get_rocksdb_lock_cf_option(config: &toml::Value) -> RocksdbOptions {
     // Currently if we want create bloom filter for memtable, we must set prefix extractor.
     opts.set_prefix_extractor("NoopSliceTransform", Box::new(NoopSliceTransform))
         .unwrap_or_else(|err| exit_with_err(format!("{:?}", err)));
+    let memtable_prefix_bloom =
+        get_toml_boolean(config, "rocksdb.writecf.memtable-prefix-bloom", Some(true));
+    if memtable_prefix_bloom {
+        opts.set_memtable_prefix_bloom_size_ratio(0.1 as f64);
+    }
     opts
 }
 

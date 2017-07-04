@@ -1,6 +1,6 @@
 [bench.config]
-warmup-count = 50000
-bench-count = 100000 
+warmup-count = 200000
+bench-count = 200000
 batch-size = 16
 region-num = 100
 ## cf(d: default, l: lock, r: raft, w: write)
@@ -9,9 +9,9 @@ operations = "wrld"
 [lockcf.data]
 key-len = 32
 value-len = 128
-## key-gen: random, repeat, increase, raft
+## key-gen: random, repeat, increase, sequence (especially for raftlogcf)
 key-gen = "random"
-## value-gen: random, const
+## value-gen: random, repeat
 value-gen = "random"
 
 [defaultcf.data]
@@ -29,7 +29,7 @@ value-gen = "random"
 [raftcf.data]
 key-len = 17
 value-len = 128
-key-gen = "raft"
+key-gen = "sequence"
 value-gen = "random"
 
 [rocksdb]
@@ -69,8 +69,7 @@ compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 # max-bytes-for-level-base = "512MB"
 # target-file-size-base = "32MB"
 # block-cache-size = "1GB"
-# cache-index-and-filter-blocks = true
-# memtable-prefix-bloom-size-ratio = 0.1
+# cache-index-and-filter-blocks = true  
 
 [rocksdb.lockcf]
 block-size = "16KB"
@@ -88,7 +87,8 @@ level0-file-num-compaction-trigger = 1
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
 # compaction-style = 0
-# memtable-prefix-bloom-size-ratio = 0.1
+# memtable-prefix-bloom = true
+# cache-size = "1GB"
 
 [rocksdb.writecf]
 compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
@@ -98,16 +98,15 @@ compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 # min-write-buffer-number-to-merge = 1
 # max-bytes-for-level-base = "512MB"
 # target-file-size-base = "32MB"
-# in normal cases should tune to 10%-30% system's total memory.
 # block-cache-size = "256MB"
 # cache-index-and-filter-blocks = true
 # level0-file-num-compaction-trigger = 4
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
 # cache-index-and-filter-blocks = true
-# memtable-prefix-bloom-size-ratio = 0.1
+# memtable-prefix-bloom = true
  
-[rocksdb.raftcf]
+[rocksdb.raftlogcf]
 compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 # block-size = "64KB"
 # write-buffer-size = "128MB"
@@ -121,4 +120,4 @@ compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
 # level0-slowdown-writes-trigger = 20
 # level0-stop-writes-trigger = 36
 # cache-index-and-filter-blocks = true
-# memtable-prefix-bloom-size-ratio = 0.1
+# cache-size = "1GB"
