@@ -4,7 +4,7 @@ bench-count = 200000
 batch-size = 16
 region-num = 100
 ## cf(d: default, l: lock, r: raft, w: write)
-operations = "wrld"
+operate-cfs = "wrld"
 
 [lockcf.data]
 key-len = 32
