@@ -12,6 +12,10 @@
 // limitations under the License.
 
 pub mod helper;
-pub mod check;
-pub mod kgcfg;
-pub mod dbcfg;
+pub mod utils;
+
+pub type CfName = &'static str;
+pub const CF_DEFAULT: CfName = "default";
+pub const CF_LOCK: CfName = "lock";
+pub const CF_WRITE: CfName = "write";
+pub const CF_RAFT: CfName = "raft";

@@ -11,37 +11,67 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{Rng, thread_rng};
+use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
 
 pub trait ValGen {
     fn next(&mut self) -> Option<&[u8]>;
 }
 
-pub struct ConstValGen {
+pub struct RepeatValGen {
     val: Vec<u8>,
 }
 
-impl ConstValGen {
-    pub fn new(len: usize) -> ConstValGen {
-        let mut vals = ConstValGen { val: vec![0; len] };
+impl RepeatValGen {
+    pub fn new(len: usize) -> RepeatValGen {
+        let mut vals = RepeatValGen { val: vec![0; len] };
         thread_rng().fill_bytes(&mut vals.val);
         vals
     }
 }
 
-impl ValGen for ConstValGen {
+impl ValGen for RepeatValGen {
     fn next(&mut self) -> Option<&[u8]> {
+        Some(&self.val)
+    }
+}
+
+pub struct RandValGen {
+    val: Vec<u8>,
+    rand: XorShiftRng,
+}
+
+impl RandValGen {
+    pub fn new(len: usize) -> RandValGen {
+        RandValGen {
+            val: vec![0; len],
+            rand: XorShiftRng::from_seed([1; 4]),
+        }
+    }
+}
+
+impl ValGen for RandValGen {
+    fn next(&mut self) -> Option<&[u8]> {
+        self.rand.fill_bytes(&mut self.val);
         Some(&self.val)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{ValGen, ConstValGen};
+    use super::{ValGen, RepeatValGen, RandValGen};
 
     #[test]
     fn test_const_valgen() {
-        let mut vg = ConstValGen::new(8);
+        let mut vg = RepeatValGen::new(8);
+        for _ in 0..8 {
+            let val = vg.next().expect("");
+            println!("{:?}", val);
+        }
+    }
+
+    #[test]
+    fn test_rand_valgen() {
+        let mut vg = RandValGen::new(8);
         for _ in 0..8 {
             let val = vg.next().expect("");
             println!("{:?}", val);

@@ -16,24 +16,34 @@ extern crate clap;
 extern crate rocksdb;
 extern crate toml;
 extern crate rand;
+#[macro_use]
+extern crate log;
 
 use std::process;
 use std::time::Instant;
 use std::boxed::Box;
+use std::sync::Arc;
+use std::path::Path;
+use std::fs::File;
+use std::io::Read;
+use std::str;
 
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 use rocksdb::DB;
 
 mod sim;
 mod env;
-use env::dbcfg;
-use sim::key::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen};
-use sim::val::ConstValGen;
-use sim::cf::{cf_default_w, cf_lock_w, cf_write_w, cf_raft_w};
+use env::utils;
+use sim::key::{KeyGen, RepeatKeyGen, IncreaseKeyGen, RandomKeyGen, SeqKeyGen};
+use sim::val::{ValGen, RepeatValGen, RandValGen};
+use sim::cf::{cfs_write, ColumnFamilies};
+use env::{CF_WRITE, CF_RAFT, CF_LOCK, CF_DEFAULT};
+use env::helper::{get_toml_string, get_toml_int};
 
-const DEFAULT_KEY_LEN: usize = 32;
-const DEFAULT_VALUE_LEN: usize = 128;
-const DEFAULT_BATCH_SIZE: usize = 128;
+const DEFAULT_WARMUP_COUNT: i64 = 200000;
+const DEFAULT_BENCH_COUNT: i64 = 200000;
+const DEFAULT_BATCH_SIZE: i64 = 128;
+const DEFAULT_REGION_NUM: i64 = 100;
 
 const ROCKSDB_DB_STATS_KEY: &'static str = "rocksdb.dbstats";
 const ROCKSDB_CF_STATS_KEY: &'static str = "rocksdb.cfstats";
@@ -42,11 +52,6 @@ fn run() -> Result<usize, String> {
     let app = App::new("Rocksdb in TiKV")
         .author("PingCAP")
         .about("Benchmark of rocksdb in the sim-tikv-env")
-        .arg(Arg::with_name("skip_sys_check")
-            .short("N")
-            .takes_value(false)
-            .help("skip system check")
-            .required(false))
         .arg(Arg::with_name("db_path")
             .short("d")
             .long("db")
@@ -58,131 +63,177 @@ fn run() -> Result<usize, String> {
             .long("config")
             .takes_value(true)
             .help("toml config file")
-            .required(true))
-        .arg(Arg::with_name("count")
-            .short("n")
-            .long("count")
-            .takes_value(true)
-            .help("request count")
-            .required(true))
-        .arg(Arg::with_name("key_len")
-            .short("K")
-            .long("key_len")
-            .takes_value(true)
-            .help("set key len")
-            .required(false))
-        .arg(Arg::with_name("val_len")
-            .short("V")
-            .long("val_len")
-            .takes_value(true)
-            .help("set value len")
-            .required(false))
-        .arg(Arg::with_name("batch_size")
-            .short("B")
-            .long("batch_size")
-            .takes_value(true)
-            .help("set batch size")
-            .required(false))
-        .arg(Arg::with_name("key_gen")
-            .short("k")
-            .long("key_gen")
-            .takes_value(true)
-            .help("key generator, [repeat, increase, random]")
-            .default_value("random")
-            .required(false))
-        .subcommand(SubCommand::with_name("cf")
-            .subcommand(SubCommand::with_name("default"))
-            .subcommand(SubCommand::with_name("lock"))
-            .subcommand(SubCommand::with_name("write"))
-            .subcommand(SubCommand::with_name("raft")))
-        .subcommand(SubCommand::with_name("txn"));
+            .required(true));
 
     let matches = app.clone().get_matches();
 
-    if !matches.is_present("skip_sys_check") {
-        if let Err(e) = env::check::check_system_config() {
-            return Err(format!("system config not satisfied: {}\n", e));
+    let db_path = Path::new(matches.value_of("db_path").unwrap());
+    let config = match matches.value_of("config") {
+        Some(path) => {
+            let mut config_file = File::open(&path).expect("config open failed");
+            let mut s = String::new();
+            config_file.read_to_string(&mut s).expect("config read failed");
+            toml::Value::Table(toml::Parser::new(&s)
+                .parse()
+                .expect("malformed config file"))
         }
+        // Default empty value, lookup() always returns `None`.
+        None => toml::Value::Integer(0),
+    };
+
+    let db_opts = utils::get_rocksdb_db_option(&config);
+    let cfs_opts =
+        vec![utils::CFOptions::new(CF_DEFAULT, utils::get_rocksdb_default_cf_option(&config)),
+             utils::CFOptions::new(CF_LOCK, utils::get_rocksdb_lock_cf_option(&config)),
+             utils::CFOptions::new(CF_WRITE, utils::get_rocksdb_write_cf_option(&config)),
+             utils::CFOptions::new(CF_RAFT, utils::get_rocksdb_raftlog_cf_option(&config))];
+    let db_path = db_path.clone();
+    let db = Arc::new(utils::new_engine_opt(db_path.to_str()
+                                                .unwrap(),
+                                            db_opts,
+                                            cfs_opts)
+        .unwrap_or_else(|err| utils::exit_with_err(format!("{:?}", err))));
+
+
+
+    let warmup_cnt = get_toml_int(&config,
+                                  ("bench.config.warmup-count").chars().as_str(),
+                                  Some(DEFAULT_WARMUP_COUNT)) as usize;
+    let bench_cnt = get_toml_int(&config,
+                                 ("bench.config.bench-count").chars().as_str(),
+                                 Some(DEFAULT_BENCH_COUNT)) as usize;
+    let batch_size = get_toml_int(&config,
+                                  ("bench.config.batch-size").chars().as_str(),
+                                  Some(DEFAULT_BATCH_SIZE)) as usize;
+    let region_num = get_toml_int(&config,
+                                  ("bench.config.region-num").chars().as_str(),
+                                  Some(DEFAULT_REGION_NUM)) as usize;
+    let operate_cfs = get_toml_string(&config,
+                                      ("bench.config.operate-cfs").chars().as_str(),
+                                      Some(String::from("d")));
+
+    let kgen_default = get_toml_string(&config,
+                                       ("defaultcf.data.key-gen").chars().as_str(),
+                                       Some(String::from("random")));
+    let kgen_lock = get_toml_string(&config,
+                                    ("lockcf.data.key-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let kgen_raft = get_toml_string(&config,
+                                    ("raftcf.data.key-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let kgen_write = get_toml_string(&config,
+                                     ("writecf.data.key-gen").chars().as_str(),
+                                     Some(String::from("random")));
+    let vgen_default = get_toml_string(&config,
+                                       ("defaultcf.data.value-gen").chars().as_str(),
+                                       Some(String::from("random")));
+    let vgen_lock = get_toml_string(&config,
+                                    ("lockcf.data.value-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let vgen_raft = get_toml_string(&config,
+                                    ("raftcf.data.value-gen").chars().as_str(),
+                                    Some(String::from("random")));
+    let vgen_write = get_toml_string(&config,
+                                     ("writecf.data.value-gen").chars().as_str(),
+                                     Some(String::from("random")));
+    let klen_default = get_toml_int(&config,
+                                    ("defaultcf.data.key-len").chars().as_str(),
+                                    Some(32)) as usize;
+    let klen_lock =
+        get_toml_int(&config, ("lockcf.data.key-len").chars().as_str(), Some(32)) as usize;
+    let klen_raft =
+        get_toml_int(&config, ("raftcf.data.key-len").chars().as_str(), Some(32)) as usize;
+    let klen_write =
+        get_toml_int(&config, ("writecf.data.key-len").chars().as_str(), Some(32)) as usize;
+    let vlen_default = get_toml_int(&config,
+                                    ("defaultcf.data.value-len").chars().as_str(),
+                                    Some(128)) as usize;
+    let vlen_lock = get_toml_int(&config,
+                                 ("lockcf.data.value-len").chars().as_str(),
+                                 Some(128)) as usize;
+    let vlen_raft = get_toml_int(&config,
+                                 ("raftcf.data.value-len").chars().as_str(),
+                                 Some(128)) as usize;
+    let vlen_write = get_toml_int(&config,
+                                  ("writecf.data.value-len").chars().as_str(),
+                                  Some(128)) as usize;
+
+    let mut warmup_k_d: Box<KeyGen> = key_type(&kgen_default, klen_default, warmup_cnt, region_num);
+    let mut warmup_k_l: Box<KeyGen> = key_type(&kgen_lock, klen_lock, warmup_cnt, region_num);
+    let mut warmup_k_r: Box<KeyGen> = key_type(&kgen_raft, klen_raft, warmup_cnt, region_num);
+    let mut warmup_k_w: Box<KeyGen> = key_type(&kgen_write, klen_write, warmup_cnt, region_num);
+
+    let mut bench_k_d: Box<KeyGen> = key_type(&kgen_default, klen_default, bench_cnt, region_num);
+    let mut bench_k_l: Box<KeyGen> = key_type(&kgen_lock, klen_lock, bench_cnt, region_num);
+    let mut bench_k_r: Box<KeyGen> = key_type(&kgen_raft, klen_raft, bench_cnt, region_num);
+    let mut bench_k_w: Box<KeyGen> = key_type(&kgen_write, klen_write, bench_cnt, region_num);
+
+    let mut v_d: Box<ValGen> = value_type(&vgen_default, vlen_default);
+    let mut v_l: Box<ValGen> = value_type(&vgen_lock, vlen_lock);
+    let mut v_r: Box<ValGen> = value_type(&vgen_raft, vlen_raft);
+    let mut v_w: Box<ValGen> = value_type(&vgen_write, vlen_write);
+
+    let default_cf = db.cf_handle(CF_DEFAULT).unwrap();
+    let lock_cf = db.cf_handle(CF_LOCK).unwrap();
+    let write_cf = db.cf_handle(CF_WRITE).unwrap();
+    let raft_cf = db.cf_handle(CF_RAFT).unwrap();
+
+    let mut column_families = ColumnFamilies {
+        default: false,
+        lock: false,
+        raft: false,
+        write: false,
+    };
+    let command = operate_cfs.as_str();
+    if command.contains("d") {
+        column_families.default = true
     }
+    if command.contains("l") {
+        column_families.lock = true
+    }
+    if command.contains("r") {
+        column_families.raft = true
+    }
+    if command.contains("w") {
+        column_families.write = true
+    }
+    let _ = cfs_write(&db,
+                      &column_families,
+                      &mut *warmup_k_d,
+                      &mut *v_d,
+                      &mut *warmup_k_l,
+                      &mut *v_l,
+                      &mut *warmup_k_r,
+                      &mut *v_r,
+                      &mut *warmup_k_w,
+                      &mut *v_w,
+                      batch_size,
+                      default_cf,
+                      lock_cf,
+                      raft_cf,
+                      write_cf);
 
-    let db_path = matches.value_of("db_path").unwrap();
-    let cfg = matches.value_of("config").unwrap();
-    let (opt_db, opt_cf) = try!(dbcfg::get_db_config(cfg));
-    let db = try!(DB::open_cf(opt_db, db_path, &["default"], &[&opt_cf]));
-
-    let count = match matches.value_of("count") {
-        Some(v) => {
-            match v.parse() {
-                Ok(v) => v,
-                Err(count) => return Err(format!("{} is not a number", count)),
-            }
-        }
-        None => DEFAULT_KEY_LEN,
-    };
-    let key_len = match matches.value_of("key_len") {
-        Some(v) => {
-            match v.parse() {
-                Ok(v) => v,
-                Err(key_len) => return Err(format!("{} is not a number", key_len)),
-            }
-        }
-        None => DEFAULT_VALUE_LEN,
-    };
-    let val_len = match matches.value_of("val_len") {
-        Some(v) => {
-            match v.parse() {
-                Ok(v) => v,
-                Err(val_len) => return Err(format!("{} is not a number", val_len)),
-            }
-        }
-        None => DEFAULT_VALUE_LEN,
-    };
-    let batch_size = match matches.value_of("batch_size") {
-        Some(v) => {
-            match v.parse() {
-                Ok(v) => v,
-                Err(batch_size) => return Err(format!("{} is not a number", batch_size)),
-            }
-        } 
-        None => DEFAULT_BATCH_SIZE,
-    };
-
-    let mut key_gen: Box<KeyGen> = match matches.value_of("key_gen").unwrap() {
-        "repeat" => Box::new(RepeatKeyGen::new(key_len, count)),
-        "increase" => Box::new(IncreaseKeyGen::new(key_len, count)),
-        "random" => Box::new(RandomKeyGen::new(key_len, count)),
-        invalid => return Err(format!("{} is not a valid key_gen", invalid)),
-    };
-    let mut val_gen = ConstValGen::new(val_len);
-
-    let res = match matches.subcommand() {
-        ("cf", Some(cf)) => {
-            match cf.subcommand_name().unwrap() {
-                "default" => cf_default_w(&db, &mut *key_gen, &mut val_gen, batch_size),
-                "lock" => cf_lock_w(&db, &mut *key_gen, &mut val_gen, batch_size),
-                "write" => cf_write_w(&db, &mut *key_gen, &mut val_gen, batch_size),
-                "raft" => cf_raft_w(&db, &mut *key_gen, &mut val_gen, batch_size),
-                _ => help_err(app),
-            }
-        }
-        ("txn", _) => {
-            return Err("txn bench mark not impl".to_owned());
-        }
-        _ => help_err(app),
-    };
+    let bench_res = cfs_write(&db,
+                              &column_families,
+                              &mut *bench_k_d,
+                              &mut *v_d,
+                              &mut *bench_k_l,
+                              &mut *v_l,
+                              &mut *bench_k_r,
+                              &mut *v_r,
+                              &mut *bench_k_w,
+                              &mut *v_w,
+                              batch_size,
+                              default_cf,
+                              lock_cf,
+                              raft_cf,
+                              write_cf);
 
     output_stats(&db);
-
-    match res {
-        Ok(_) => Ok(count),
+    match bench_res {
+        Ok(_) => Ok(bench_cnt),
         Err(e) => Err(e),
     }
-}
-
-fn help_err(app: clap::App) -> Result<(), String> {
-    let mut help = Vec::new();
-    app.write_help(&mut help).unwrap();
-    Err(String::from_utf8(help).unwrap())
 }
 
 fn output_stats(db: &DB) {
@@ -194,6 +245,24 @@ fn output_stats(db: &DB) {
         if let Some(cf_stats) = db.get_property_value_cf(handler, ROCKSDB_CF_STATS_KEY) {
             print!("{}", cf_stats);
         }
+    }
+}
+
+fn key_type(key_gen: &str, key_len: usize, count: usize, region_num: usize) -> Box<KeyGen> {
+    match key_gen {
+        "repeat" => Box::new(RepeatKeyGen::new(key_len, count)),
+        "increase" => Box::new(IncreaseKeyGen::new(key_len, count)),
+        "random" => Box::new(RandomKeyGen::new(key_len, count)),
+        "sequence" => Box::new(SeqKeyGen::new(key_len, count, region_num)),
+        _ => unreachable!("key-gen cannot be {:?}", key_gen),
+    }
+}
+
+fn value_type(val_gen: &str, val_len: usize) -> Box<ValGen> {
+    match val_gen {
+        "repeat" => Box::new(RepeatValGen::new(val_len)),
+        "random" => Box::new(RandValGen::new(val_len)),
+        _ => unreachable!("value-gen cannot be {:?}", val_gen),
     }
 }
 

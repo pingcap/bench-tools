@@ -1,3 +1,0 @@
-# config, warmup_cnt, bench_cnt, key_len, val_len, batch_size, key_gen, bench_mode, cf
-cases/compaction-priority/0.toml 1000000 100000000 32 128 256 random cf default
-cases/compaction-priority/3.toml 1000000 100000000 32 128 256 random cf default

@@ -1,0 +1,123 @@
+[bench.config]
+warmup-count = 200000
+bench-count = 200000
+batch-size = 16
+region-num = 100
+## cf(d: default, l: lock, r: raft, w: write)
+operate-cfs = "wrld"
+
+[lockcf.data]
+key-len = 32
+value-len = 128
+## key-gen: random, repeat, increase, sequence (especially for raftlogcf)
+key-gen = "random"
+## value-gen: random, repeat
+value-gen = "random"
+
+[defaultcf.data]
+key-len = 32
+value-len = 128
+key-gen = "random"
+value-gen = "random"
+
+[writecf.data]
+key-len = 32
+value-len = 128
+key-gen = "random"
+value-gen = "random"
+
+[raftcf.data]
+key-len = 17
+value-len = 128
+key-gen = "sequence"
+value-gen = "random"
+
+[rocksdb]
+# wal-recovery-mode = 2
+# wal-dir = ""
+# wal-ttl-seconds = 0
+# wal-size-limit = 0
+# max-total-wal-size = "4GB"
+# max-background-compactions = 6
+# max-background-flushes = 2
+# base-background-compactions = 1
+# max-manifest-file-size = "20MB"
+# create-if-missing = true
+# max-open-files = 40960
+# enable-statistics = true
+# stats-dump-period-sec = 600
+# compaction-readahead-size = 0
+# info-log-max-size = 0
+# info-log-roll-time = "0s"
+# info-log-dir = ""
+# rate-bytes-per-sec = 0
+# max-sub-compactions = 1
+# writable-file-max-buffer-size = "1MB"
+# use-direct-io-for-flush-and-compaction = false
+ 
+[rocksdb.defaultcf]
+compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
+# block-size = "64KB"
+# bloom-filter-bits-per-key = 10
+# block-based-bloom-filter = false
+# level0-file-num-compaction-trigger = 4
+# level0-slowdown-writes-trigger = 20
+# level0-stop-writes-trigger = 36
+# write-buffer-size = "128MB"
+# max-write-buffer-number = 5
+# min-write-buffer-number-to-merge = 1
+# max-bytes-for-level-base = "512MB"
+# target-file-size-base = "32MB"
+# block-cache-size = "1GB"
+# cache-index-and-filter-blocks = true  
+
+[rocksdb.lockcf]
+block-size = "16KB"
+# block-cache-size = "256MB"
+# cache-index-and-filter-blocks = true
+# bloom-filter-bits-per-key = 10
+# block-based-bloom-filter = false
+compression-per-level = "no:no:no:no:no:no:no"
+# write-buffer-size = "128MB"
+# max-write-buffer-number = 5
+# min-write-buffer-number-to-merge = 1
+max-bytes-for-level-base = "128MB"
+# target-file-size-base = "32MB"
+level0-file-num-compaction-trigger = 1
+# level0-slowdown-writes-trigger = 20
+# level0-stop-writes-trigger = 36
+# compaction-style = 0
+# memtable-prefix-bloom = true
+# cache-size = "1GB"
+
+[rocksdb.writecf]
+compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
+# block-size = "64KB"
+# write-buffer-size = "128MB"
+# max-write-buffer-number = 5
+# min-write-buffer-number-to-merge = 1
+# max-bytes-for-level-base = "512MB"
+# target-file-size-base = "32MB"
+# block-cache-size = "256MB"
+# cache-index-and-filter-blocks = true
+# level0-file-num-compaction-trigger = 4
+# level0-slowdown-writes-trigger = 20
+# level0-stop-writes-trigger = 36
+# cache-index-and-filter-blocks = true
+# memtable-prefix-bloom = true
+ 
+[rocksdb.raftlogcf]
+compression-per-level = "no:no:lz4:lz4:lz4:lz4:lz4"
+# block-size = "64KB"
+# write-buffer-size = "128MB"
+# max-write-buffer-number = 5
+# min-write-buffer-number-to-merge = 1
+# max-bytes-for-level-base = "512MB"
+# target-file-size-base = "32MB"
+# should tune to 256MB~2GB.
+# block-cache-size = "256MB"
+# level0-file-num-compaction-trigger = 4
+# level0-slowdown-writes-trigger = 20
+# level0-stop-writes-trigger = 36
+# cache-index-and-filter-blocks = true
+# cache-size = "1GB"

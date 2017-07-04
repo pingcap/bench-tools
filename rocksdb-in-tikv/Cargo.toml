@@ -16,6 +16,8 @@ clap = "2"
 libc = "0.2"
 toml = "0.1"
 rand = "0.3"
+byteorder = "1"
+log = "0.3"
 
 [dependencies.rocksdb]
 git = "https://github.com/pingcap/rust-rocksdb.git"
